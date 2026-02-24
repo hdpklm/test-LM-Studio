@@ -1,4 +1,4 @@
 openai
-googlesearch-python
 requests
 beautifulsoup4
+googlesearch-python

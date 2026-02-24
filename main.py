@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from openai import OpenAI
 from googlesearch import search
 
-# --- Configuration ---
+# --- Configuration LM-Studio ---
 LM_STUDIO_BASE_URL = "http://localhost:1234/v1"
 LM_STUDIO_API_KEY = "lm-studio"
 
@@ -194,3 +194,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
