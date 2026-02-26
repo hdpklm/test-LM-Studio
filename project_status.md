@@ -1,4 +1,4 @@
-# Estado del Proyecto (v1.7)
+# Estado del Proyecto (v1.9)
 
 ## Main Project
 
@@ -12,9 +12,18 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 ### Sección de archivos de código
 
 - **`test-LM-Studio/main.py`**
-	- `search_google_and_print(query)`: Parámetro: `query` (string). Devuelve: `string` (JSON). Hace la búsqueda en google.
-	- `read_web_page(url)`: Parámetro: `url` (string). Devuelve: `string`. Extrae el contenido y lo convierte a texto.
-	- `main()`: Parámetros: ninguno. Devuelve: `None`. Bucle principal interactivo con LLM (LM-Studio).
+	- Descripción: Servidor FastAPI Backend para el chat (v1.9).
+	- Endpoints:
+		- `POST /api/chat`: Parámetros en body JSON. Devuelve: `JSON` con la respuesta del LLM y tool calls.
+		- `GET /api/history`: Devuelve: `JSON` array con la lista de conversaciones.
+		- `GET /api/history/{id}`: Devuelve: `JSON` de una conversación específica.
+		- `POST /api/upload`: Parámetros `FormData` con archivo. Devuelve: `JSON` estado.
+		- `GET /api/generated`: Devuelve: `JSON` lista de archivos de versiones.
+		- `GET /api/download/{filename}`: Retorna enlace de descarga para el archivo en Frontend.
+	- Funciones Principales (Herramientas):
+		- `search_google_and_print(query)`: Parámetro: `query` (string). Devuelve: `string` (JSON). Hace la búsqueda en google.
+		- `read_web_page(url)`: Parámetro: `url` (string). Devuelve: `string`. Extrae el contenido y lo convierte a texto.
+		- `deep_thinking(prompt)`: Parámetro: `prompt` (string). Devuelve: `string`. Realiza pensamientos en profundidad agregando múltiples modelos/llamadas.
 
 ## Futuros Desarrollos / Agentes
 
@@ -27,3 +36,6 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 	- **`agente_python_arquitecto.mini.md`**: Versión corta y directa (Agente Arquitecto Python).
 - **`test-LM-Studio/SysPro/`**
 	- **Propósito**: Esta carpeta almacena los system prompts que tiene que utilizar cada agente.
+- **`test-LM-Studio/gemini_test/`**
+	- **Propósito**: Directorio exclusivo para almacenar todos los archivos de prueba generados durante el desarrollo, organizados por sección (e.g. `backend`, `frontend`).
+	- Archivos actuales: `backend/test_chat.py`.

@@ -39,3 +39,21 @@
 - **Problema**: El flujo documentado en v1.6 asumía que el agente generaba primero el archivo normal y no incluía pausas de revisión ni el proceso de modificación.
 - **Causa**: Aclaración del usuario: el archivo de entrada/modificación principal es el `.mini.md`, y se requiere revisión humana antes de pasar al prompt de sistema.
 - **Solución**: Se ha reescrito la regla global en `project_status.md` (v1.7). Ahora especifica que toda idea/modificación empieza en el `.mini.md` (revisado por el usuario), luego el agente expande al `.md` normal, espera revisión y, por último, genera el `SysPro/prompt_...md`.
+
+### 📝 Registro: [v1.8] - Creación Web App Claude-like y Backend FastAPI
+- **Problema**: Falta de una interfaz de usuario cómoda y robusta para conversar con LM-Studio, además de no tener capacidad para gestionar historial, archivos subidos (imágenes/audio) o interpretación de React.
+- **Causa**: Petición del usuario para construir una aplicación React local en `react-web` con Drawers interactivos (izquierdo y derecho) similares a Claude.
+- **Solución**: Refactor de `test-LM-Studio/main.py` de una consola interactiva a un servidor FastAPI. Creación inicial de la estructura Pnpm + Vite + React + Tailwind en la carpeta `react-web`.
+
+# Backup
+
+### [v1.8] main()` de test-LM-Studio/main.py (Bucle Interactivo Antiguo)
+- **Función anterior**: `main()` ejecutaba un bucle `while True` en consola usando `input()`, procesando llamadas a herramientas secuencialmente y deteniéndose con 'quit'.
+- **Razón del cambio**: Incompatible con una arquitectura web asíncrona donde el frontend (React) controla la entrada y salida, requiriéndose exponer la funcionalidad vía HTTP.
+- **Nueva versión**: Rutas FastAPI (ej. `POST /api/chat`) reemplazarán la interacción por terminal.
+
+### 📝 Registro: [v1.9] - Login React, Fix 422 y Tests
+- **Problema**: Request 422 al chatear, falta de página Login, y test scripts mal ubicados rompiendo la regla de tests.
+- **Causa**: El `history_id` no era opcional en el backend FastAPI y el archivo `test_chat.py` estaba en la raíz temporaria en vez de la carpeta de test.
+- **Solución**: Se ha corregido el modelo `ChatRequest` añadiendo `Optional[str]` a `history_id`. Se ha implementado `LoginPage.jsx` en React integrada con React Router en `/login`. Se ha movido `test_chat.py` a la carpeta restrictiva requerida `gemini_test/backend/`.
+

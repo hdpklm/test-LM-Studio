@@ -169,17 +169,56 @@ tools = [
     }
 ]
 
-# --- Main Interaction Loop ---
+# --- FastAPI Server and Endpoints ---
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional
+import os
+import glob
 
-def main():
+app = FastAPI(title="LM-Studio Custom Chat API", version="1.8")
+
+# CORS middleware for React frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Directories
+HISTORY_DIR = "history-chat"
+GENERATED_DIR = "generated-files"
+UPLOAD_DIR = "history-chat/uploads" # For simplicity, putting uploads inside history
+
+os.makedirs(HISTORY_DIR, exist_ok=True)
+os.makedirs(GENERATED_DIR, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history_id: Optional[str] = None  # Optional: continue existing conversation
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    """
+    Handles user chat messages, maintains history, and processes tool calls.
+    """
+    print(f"\n[DEBUG] Incoming chat request: {request.dict()}")
     client = OpenAI(base_url=LM_STUDIO_BASE_URL, api_key=LM_STUDIO_API_KEY)
-    
-    print(f"Connected to LM-Studio at {LM_STUDIO_BASE_URL}")
-    print("Type 'quit' to exit.")
     
     system_prompt = (
         "You are a helpful assistant. "
-        "You have access to 'search_google_and_print' to find information and 'read_web_page' to read content from URLs. "
+        "You have access to 'search_google_and_print' to find information, 'read_web_page' to read content from URLs, and 'deep_thinking'. "
         "If the user requests JSON output, ensure the response is strictly valid JSON, without markdown formatting. "
         "Unless specified otherwise, use this format for search results:\n"
         "[\n"
@@ -187,76 +226,107 @@ def main():
         "]"
     )
 
-    messages = [
-        {"role": "system", "content": system_prompt}
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
+    
+    # In a real app, we would load existing history from HISTORY_DIR based on request.history_id here
+    # For now, we simulate starting fresh or appending to memory if we had a persistent store per session.
+    messages.append({"role": "user", "content": request.message})
 
-    while True:
-        user_input = input("\nUser: ")
-        if user_input.lower() in ["quit", "exit"]:
-            break
-            
-        messages.append({"role": "user", "content": user_input})
+    try:
+        completion = client.chat.completions.create(
+            model="model-identifier",
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"
+        )
         
-        try:
-            completion = client.chat.completions.create(
+        response_message = completion.choices[0].message
+        tool_calls = response_message.tool_calls
+        
+        if tool_calls:
+            print(f"\n[RAW TOOL CALL] Model requested:\n{tool_calls}\n")
+            messages.append(response_message)
+            
+            for tool_call in tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+                function_response = None
+                
+                if function_name == "search_google_and_print":
+                    function_response = search_google_and_print(query=function_args.get("query"))
+                elif function_name == "read_web_page":
+                    function_response = read_web_page(url=function_args.get("url"))
+                elif function_name == "deep_thinking":
+                    function_response = deep_thinking(prompt=function_args.get("prompt"))
+                
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": function_name,
+                    "content": function_response or ""
+                })
+            
+            second_response = client.chat.completions.create(
                 model="model-identifier",
-                messages=messages,
-                tools=tools,
-                tool_choice="auto"
+                messages=messages
             )
-            
-            response_message = completion.choices[0].message
-            tool_calls = response_message.tool_calls
-            
-            if tool_calls:
-                # Log raw tool calls
-                print(f"\n[RAW TOOL CALL] Model requested:\n{tool_calls}\n")
-                
-                messages.append(response_message)
-                
-                for tool_call in tool_calls:
-                    function_name = tool_call.function.name
-                    function_args = json.loads(tool_call.function.arguments)
-                    
-                    function_response = None
-                    
-                    if function_name == "search_google_and_print":
-                        function_response = search_google_and_print(
-                            query=function_args.get("query")
-                        )
-                    elif function_name == "read_web_page":
-                        function_response = read_web_page(
-                            url=function_args.get("url")
-                        )
-                    elif function_name == "deep_thinking":
-                        function_response = deep_thinking(
-                            prompt=function_args.get("prompt")
-                        )
-                    
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "name": function_name,
-                        "content": function_response or ""
-                    })
-                
-                # Get final answer
-                second_response = client.chat.completions.create(
-                    model="model-identifier",
-                    messages=messages
-                )
-                print(f"\nAssistant: {second_response.choices[0].message.content}")
-                messages.append(second_response.choices[0].message)
-                
-            else:
-                print(f"\nAssistant: {response_message.content}")
-                messages.append(response_message)
-                
-        except Exception as e:
-            print(f"\nError: {e}")
-            print("Make sure LM-Studio server is running and accessible.")
+            final_content = second_response.choices[0].message.content
+        else:
+            final_content = response_message.content
+
+        # Save history logic would go here
+        
+        return {"response": final_content, "role": "assistant"}
+
+    except Exception as e:
+        print(f"\nError: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/history")
+async def get_history_list():
+    """Returns a list of saved conversations."""
+    files = glob.glob(os.path.join(HISTORY_DIR, "*.json"))
+    history_list = []
+    for f in files:
+        history_list.append({"id": os.path.basename(f), "name": os.path.basename(f).replace(".json", "")})
+    return history_list
+
+@app.get("/api/history/{history_id}")
+async def get_history_detail(history_id: str):
+    """Returns the details of a specific conversation."""
+    file_path = os.path.join(HISTORY_DIR, f"{history_id}.json")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="History not found")
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Handles file uploads."""
+    file_location = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_location, "wb+") as file_object:
+        file_object.write(file.file.read())
+    return {"info": f"file '{file.filename}' saved at '{file_location}'", "path": file_location}
+
+@app.get("/api/generated")
+async def list_generated_files():
+    """Lists files generated by the LLM (for the right drawer)."""
+    files = glob.glob(os.path.join(GENERATED_DIR, "*.*"))
+    # In a full version, we'd parse versions. For now, just return names.
+    gen_list = []
+    for f in files:
+        gen_list.append({"filename": os.path.basename(f), "path": f})
+    return gen_list
+
+@app.get("/api/download/{filename}")
+async def download_generated_file(filename: str):
+    """Provides a download link for generated files."""
+    file_path = os.path.join(GENERATED_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, filename=filename)
 
 if __name__ == "__main__":
-    main()
-
+    import uvicorn
+    # To run: python main.py
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
