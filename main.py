@@ -71,6 +71,50 @@ def read_web_page(url):
         print(f"\n[TOOL OUTPUT] read_web_page error:\n{error_msg}\n")
         return f"Error reading page: {error_msg}"
 
+def deep_thinking(prompt):
+    """
+    Generates 5 different thoughts about a prompt and then combines them to find the best synthesis.
+    """
+    client = OpenAI(base_url=LM_STUDIO_BASE_URL, api_key=LM_STUDIO_API_KEY)
+    thoughts = []
+    print(f"\n[SYSTEM] Deep Thinking: Generating 5 thoughts for '{prompt[:50]}...'")
+    
+    for i in range(5):
+        print(f"  > Generating thought {i+1}/5...")
+        try:
+            response = client.chat.completions.create(
+                model="model-identifier",
+                messages=[{"role": "user", "content": f"Piensa de forma creativa y profunda sobre esto: {prompt}"}],
+                temperature=0.7
+            )
+            thoughts.append(response.choices[0].message.content)
+        except Exception as e:
+            print(f"  > Error in thought {i+1}: {e}")
+            thoughts.append(f"Error generating thought {i+1}: {e}")
+
+    print(f"  > Aggregating best ideas...")
+    aggregation_prompt = (
+        f"A continuación se presentan 5 perspectivas o pensamientos diferentes sobre el prompt: '{prompt}'.\n\n"
+        "--- PENSAMIENTOS ---\n"
+        + "\n\n".join([f"Pensamiento {i+1}:\n{t}" for i, t in enumerate(thoughts)]) +
+        "\n\n--- TAREA ---\n"
+        "Analiza estos pensamientos y extrae las mejores ideas, o crea una síntesis superior que combine lo mejor de todos ellos. "
+        "Tu respuesta debe ser el resultado final de este pensamiento profundo."
+    )
+
+    try:
+        final_response = client.chat.completions.create(
+            model="model-identifier",
+            messages=[{"role": "user", "content": aggregation_prompt}]
+        )
+        result = final_response.choices[0].message.content
+        print(f"\n[TOOL OUTPUT] deep_thinking result successful.\n")
+        return result
+    except Exception as e:
+        error_msg = f"Error aggregating thoughts: {e}"
+        print(f"\n[TOOL OUTPUT] deep_thinking error: {error_msg}\n")
+        return error_msg
+
 tools = [
     {
         "type": "function",
@@ -103,6 +147,23 @@ tools = [
                     }
                 },
                 "required": ["url"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "deep_thinking",
+            "description": "Performs deep thinking by generating multiple perspectives and combining them. Use this for complex problems, creative tasks, or when a high-quality synthesis is needed.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "The topic or prompt to think deeply about."
+                    }
+                },
+                "required": ["prompt"]
             }
         }
     }
@@ -167,6 +228,10 @@ def main():
                     elif function_name == "read_web_page":
                         function_response = read_web_page(
                             url=function_args.get("url")
+                        )
+                    elif function_name == "deep_thinking":
+                        function_response = deep_thinking(
+                            prompt=function_args.get("prompt")
                         )
                     
                     messages.append({
