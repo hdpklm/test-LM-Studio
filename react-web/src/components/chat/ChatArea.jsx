@@ -7,7 +7,7 @@ import { Send, Menu, Paperclip, FileCode2 } from 'lucide-react';
 const ChatArea = () => {
 	const { toggleLeftDrawer, toggleRightDrawer, currentChatId, setHistoryList, fetchData } = useChat();
 	const [messages, setMessages] = useState([]);
-	const [input, setInput] = useState('');
+	const [input, setInput] = useState('creame una pagina en react de login');
 	const [isLoading, setIsLoading] = useState(false);
 	const [uploading, setUploading] = useState(false);
 	const fileInputRef = useRef(null);
@@ -169,8 +169,8 @@ const ChatArea = () => {
 						type="submit"
 						disabled={!input.trim() || isLoading}
 						className={`p-3 rounded-xl transition-all ${!input.trim() || isLoading
-								? 'bg-zinc-700 text-zinc-500'
-								: 'bg-[#f4ba3e] text-zinc-950 hover:bg-[#dca331] shadow-[0_0_15px_rgba(244,186,62,0.3)]'
+							? 'bg-zinc-700 text-zinc-500'
+							: 'bg-[#f4ba3e] text-zinc-950 hover:bg-[#dca331] shadow-[0_0_15px_rgba(244,186,62,0.3)]'
 							}`}
 					>
 						<Send className="w-5 h-5" />
