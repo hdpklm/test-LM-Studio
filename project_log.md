@@ -52,8 +52,18 @@
 - **Razón del cambio**: Incompatible con una arquitectura web asíncrona donde el frontend (React) controla la entrada y salida, requiriéndose exponer la funcionalidad vía HTTP.
 - **Nueva versión**: Rutas FastAPI (ej. `POST /api/chat`) reemplazarán la interacción por terminal.
 
+### [v1.9] `system_prompt` de test-LM-Studio/main.py (Prompt de Tool Call forzado alucinante)
+- **Lógica anterior**: Forzaba a devolver arrays JSON con la clave `url`, `title`, `desc`.
+- **Razón del cambio**: Confundía al modelo, que devolvía ese JSON ignorando la consulta real del usuario (ej. crear código de interfaces).
+- **Nueva versión**: Simple, se ha indicado al modelo que responda directamente al usuario si no necesita usar las tools y se ha retirado la estructura JSON forzada.
+
 ### 📝 Registro: [v1.9] - Login React, Fix 422 y Tests
 - **Problema**: Request 422 al chatear, falta de página Login, y test scripts mal ubicados rompiendo la regla de tests.
 - **Causa**: El `history_id` no era opcional en el backend FastAPI y el archivo `test_chat.py` estaba en la raíz temporaria en vez de la carpeta de test.
 - **Solución**: Se ha corregido el modelo `ChatRequest` añadiendo `Optional[str]` a `history_id`. Se ha implementado `LoginPage.jsx` en React integrada con React Router en `/login`. Se ha movido `test_chat.py` a la carpeta restrictiva requerida `gemini_test/backend/`.
+
+### 📝 Registro: [v1.10] - Fix Tool Calls (Evitar JSON alucinados)
+- **Problema**: El asistente respondía con bloques JSON de búsqueda simulados en lugar de invocar herramientas o contestar a preguntas de programación.
+- **Causa**: El `system_prompt` obligaba explícitamente a usar un formato JSON para resultados de búsqueda, sesgando fuertemente al LLM local a devolver siempre ese bloque.
+- **Solución**: Se ha reemplazado el prompt en `main.py` por instrucciones claras que separan la conversación normal del uso estricto de herramientas, retirando la imposición de JSON.
 

@@ -217,13 +217,11 @@ async def chat_endpoint(request: ChatRequest):
     client = OpenAI(base_url=LM_STUDIO_BASE_URL, api_key=LM_STUDIO_API_KEY)
     
     system_prompt = (
-        "You are a helpful assistant. "
-        "You have access to 'search_google_and_print' to find information, 'read_web_page' to read content from URLs, and 'deep_thinking'. "
-        "If the user requests JSON output, ensure the response is strictly valid JSON, without markdown formatting. "
-        "Unless specified otherwise, use this format for search results:\n"
-        "[\n"
-        "  { \"url\": \"https://www.example.com/\", \"title\": \"example\", \"desc\": \"example description\" }\n"
-        "]"
+        "You are a helpful AI assistant. "
+        "You have access to tools. If you need to search for information, use the 'search_google_and_print' tool. "
+        "If you need to read a URL, use 'read_web_page'. "
+        "If a tool is not needed, simply answer the user directly. "
+        "Do not hallucinate JSON search results in your response. Only use the tools when necessary."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
