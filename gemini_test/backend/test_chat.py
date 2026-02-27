@@ -26,3 +26,5 @@ if __name__ == "__main__":
     test_prompt("creame una pagina en react de login")
     time.sleep(2)
     test_prompt("Busca en Google las últimas noticias sobre React")
+    time.sleep(2)
+    test_prompt("busca por internet que contenido tiene la pagina uruseiyatrusa.com")

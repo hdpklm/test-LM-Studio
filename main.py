@@ -241,9 +241,70 @@ async def chat_endpoint(request: ChatRequest):
         response_message = completion.choices[0].message
         tool_calls = response_message.tool_calls
         
+        # --- Fallback Parser para modelos que escupen Tool Calls en texto ---
+        response_message_dict = None
+        if not tool_calls and response_message.content:
+            content_str = response_message.content
+            if '"name"' in content_str and '"arguments"' in content_str:
+                import json
+                parsed_tc = None
+                start_idx = content_str.find('{')
+                while start_idx != -1 and not parsed_tc:
+                    brace_count = 0
+                    for i, char in enumerate(content_str[start_idx:]):
+                        if char == '{': brace_count += 1
+                        elif char == '}': brace_count -= 1
+                        if brace_count == 0:
+                            json_str = content_str[start_idx:start_idx+i+1]
+                            try:
+                                candidate = json.loads(json_str)
+                                if isinstance(candidate, dict) and "name" in candidate and "arguments" in candidate:
+                                    parsed_tc = candidate
+                                    break
+                            except Exception:
+                                pass
+                    if parsed_tc:
+                        break
+                    start_idx = content_str.find('{', start_idx + 1)
+
+                if parsed_tc:
+                    try:
+                        class DummyFunction:
+                            def __init__(self, name, arguments):
+                                self.name = name
+                                self.arguments = json.dumps(arguments) if isinstance(arguments, dict) else str(arguments)
+                        class DummyToolCall:
+                            def __init__(self, id, function):
+                                self.id = id
+                                self.function = function
+
+                        # Fakeamos el tool_call
+                        tool_calls = [DummyToolCall(id="call_fallback", function=DummyFunction(parsed_tc["name"], parsed_tc["arguments"]))]
+                        
+                        # Creamos la versión en dict de la respuesta vacía con herramientas
+                        response_message_dict = {
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [{
+                                "id": "call_fallback",
+                                "type": "function",
+                                "function": {
+                                    "name": parsed_tc["name"],
+                                    "arguments": json.dumps(parsed_tc["arguments"]) if isinstance(parsed_tc["arguments"], dict) else str(parsed_tc["arguments"])
+                                }
+                            }]
+                        }
+                    except Exception as e:
+                        print(f"\n[DEBUG] Error preparando fallback tool call: {e}")
+        # --------------------------------------------------------------------
+        
         if tool_calls:
             print(f"\n[RAW TOOL CALL] Model requested:\n{tool_calls}\n")
-            messages.append(response_message)
+            # Agregamos la versión dict si se usó fallback, de lo contrario la normal
+            if response_message_dict:
+                messages.append(response_message_dict)
+            else:
+                messages.append(response_message)
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name

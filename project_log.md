@@ -1,3 +1,5 @@
+# Backup
+
 # Historial de Cambios del Proyecto
 
 ### 📝 Registro: [v1.0] - Inicialización y Descripción de PlanesDeTranajo
@@ -45,8 +47,6 @@
 - **Causa**: Petición del usuario para construir una aplicación React local en `react-web` con Drawers interactivos (izquierdo y derecho) similares a Claude.
 - **Solución**: Refactor de `test-LM-Studio/main.py` de una consola interactiva a un servidor FastAPI. Creación inicial de la estructura Pnpm + Vite + React + Tailwind en la carpeta `react-web`.
 
-# Backup
-
 ### [v1.8] main()` de test-LM-Studio/main.py (Bucle Interactivo Antiguo)
 - **Función anterior**: `main()` ejecutaba un bucle `while True` en consola usando `input()`, procesando llamadas a herramientas secuencialmente y deteniéndose con 'quit'.
 - **Razón del cambio**: Incompatible con una arquitectura web asíncrona donde el frontend (React) controla la entrada y salida, requiriéndose exponer la funcionalidad vía HTTP.
@@ -67,3 +67,12 @@
 - **Causa**: El `system_prompt` obligaba explícitamente a usar un formato JSON para resultados de búsqueda, sesgando fuertemente al LLM local a devolver siempre ese bloque.
 - **Solución**: Se ha reemplazado el prompt en `main.py` por instrucciones claras que separan la conversación normal del uso estricto de herramientas, retirando la imposición de JSON.
 
+### 📝 Registro: [v1.11] - Fallback Parser Tool Calls (LM-Studio)
+- **Problema**: El asistente devolvía el intento de usar herramientas como texto plano (ej. JSON crudo con `[END_TOOL_REQUEST]`) en lugar de levantar la petición formal nativa a través de la API `tool_calls`.
+- **Causa**: Modelos no nativos en LM-Studio que escupen sus pensamientos como texto en lugar de respetar la estructura JSON de tool calls de la API de OpenAI estricta.
+- **Solución**: Se implementó un regex de tipo fallback interceptor en `main.py` (`chat_endpoint`) que, si no existen llamadas nativas pero detecta `{ "name": ..., "arguments": ... }` en el texto, extrae y falsea un objeto `DummyToolCall` inyectado on-the-fly para que el loop lo reconozca.
+
+### 📝 Registro: [v1.12] - Fix Parseo de Tool Calls Anidado
+- **Problema**: El asistente se trababa si el JSON contenía llaves anidadas al usar el Fallback. La expresión regular fallaba en extraer el bloque de ejecución de herramientas.
+- **Causa**: El parser del `v1.11` estaba basado en una Expresión Regular no codiciosa que se cortaba prematuramente en el primer elemento anidado con `}` encontrado, devolviendo un JSON incompleto y fallando por detrás sin avisar.
+- **Solución**: Se sustituyó el filtro de REGEX por un contador jerárquico de bloques (matching con nivel 0 de llaves). Además se garantizó insertar el mensaje convertido a dict nativo estricto para no molestar a la librería `openai-python`.
