@@ -1,0 +1,13 @@
+{
+	"python.defaultInterpreterPath": "C:\\Hassan\\repos\\test-LM-Studio\\venv\\Scripts\\python.exe",
+	"terminal.integrated.profiles.windows": {
+		"Python (venv)": {
+			"path": "C:\\Windows\\System32\\cmd.exe",
+			"args": [
+				"/k",
+				"C:\\Hassan\\repos\\test-LM-Studio\\venv\\Scripts\\activate.bat"
+			]
+		}
+	},
+	"terminal.integrated.defaultProfile.windows": "Python (venv)"
+}
