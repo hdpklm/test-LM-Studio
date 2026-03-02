@@ -44,7 +44,7 @@ def read_web_page(url):
     """
     Reads the content of a web page and returns the text.
     """
-    # Ensure URL starts with http
+    # Ensure URL starts with http to prevent requests.exceptions.MissingSchema crash
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
 
@@ -252,21 +252,32 @@ async def chat_endpoint(request: ChatRequest):
         
         # --- Fallback Parser para modelos que escupen Tool Calls en texto ---
         response_message_dict = None
+        
+        # If the model didn't return a proper tool call natively, but put JSON in the content
         if not tool_calls and response_message.content:
             content_str = response_message.content
             if '"name"' in content_str and '"arguments"' in content_str:
                 import json
+                import re
+                
+                # Attempt to extract JSON from markdown block if present
+                match = re.search(r'```json\s*(.*?)\s*```', content_str, re.DOTALL)
+                if match:
+                    json_str = match.group(1)
+                else:
+                    json_str = content_str
+                    
                 parsed_tc = None
-                start_idx = content_str.find('{')
+                start_idx = json_str.find('{')
                 while start_idx != -1 and not parsed_tc:
                     brace_count = 0
-                    for i, char in enumerate(content_str[start_idx:]):
+                    for i, char in enumerate(json_str[start_idx:]):
                         if char == '{': brace_count += 1
                         elif char == '}': brace_count -= 1
                         if brace_count == 0:
-                            json_str = content_str[start_idx:start_idx+i+1]
+                            possible_json = json_str[start_idx:start_idx+i+1]
                             try:
-                                candidate = json.loads(json_str)
+                                candidate = json.loads(possible_json)
                                 if isinstance(candidate, dict) and "name" in candidate and "arguments" in candidate:
                                     parsed_tc = candidate
                                     break
@@ -274,14 +285,14 @@ async def chat_endpoint(request: ChatRequest):
                                 pass
                     if parsed_tc:
                         break
-                    start_idx = content_str.find('{', start_idx + 1)
+                    start_idx = json_str.find('{', start_idx + 1)
 
                 if parsed_tc:
                     try:
                         class DummyFunction:
                             def __init__(self, name, arguments):
                                 self.name = name
-                                self.arguments = json.dumps(arguments) if isinstance(arguments, dict) else str(arguments)
+                                self.arguments = arguments if isinstance(arguments, str) else json.dumps(arguments)
                         class DummyToolCall:
                             def __init__(self, id, function):
                                 self.id = id
@@ -299,7 +310,7 @@ async def chat_endpoint(request: ChatRequest):
                                 "type": "function",
                                 "function": {
                                     "name": parsed_tc["name"],
-                                    "arguments": json.dumps(parsed_tc["arguments"]) if isinstance(parsed_tc["arguments"], dict) else str(parsed_tc["arguments"])
+                                    "arguments": parsed_tc["arguments"] if isinstance(parsed_tc["arguments"], str) else json.dumps(parsed_tc["arguments"])
                                 }
                             }]
                         }
@@ -313,7 +324,22 @@ async def chat_endpoint(request: ChatRequest):
             if response_message_dict:
                 messages.append(response_message_dict)
             else:
-                messages.append(response_message)
+                # Construir manualmente el dict nativo para evitar crashes de serialización
+                tool_calls_list = []
+                for tc in tool_calls:
+                    tool_calls_list.append({
+                        "id": tc.id,
+                        "type": tc.type,
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments
+                        }
+                    })
+                messages.append({
+                    "role": "assistant",
+                    "content": response_message.content,
+                    "tool_calls": tool_calls_list
+                })
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name

@@ -96,3 +96,13 @@
 - **Problema**: Los modelos alucinan proxies o inventan partes de la URL. No se desea aplicar filtros lógicos (condicionales o RegEx) para parchear un mal comportamiento del LLM.
 - **Causa**: El LLM no sigue un nivel estricto de fidelidad al "copiar" la petición del usuario, sino que asocia conceptos semánticamente parecidos (añadir proxy).
 - **Solución**: Se eliminó de `main.py` todo tipo de parche correctivo para URLs alucinadas. En su lugar, se insertaron amenazas operativas ("CRITICALLY IMPORTANT", "NEVER hallucinate, NEVER invent") en el `system_prompt` global y en el parámetro `description` de la herramienta `read_web_page` forzando de forma agresiva a "copiar el texto letra a letra exactamente como el usuario lo proporciona".
+
+### 📝 Registro: [v1.18] - Fix Crash por Serialización de Tool Calls Nativos
+- **Problema**: `main.py` dejaba de responder (crash silencioso en backend) tras invocar herramientas correctamente (`read_web_page("uruseiyatsura.com")`), provocando que la interfaz del usuario se resetease o reenviase el prompt sin historial la siguiente vez en vez de mostrar los resultados de la herramienta.
+- **Causa**: Al obtener llamadas de función nativas (`tool_calls`) en lugar del "fallback de texto plano", `messages.append(response_message)` intentaba insertar un objeto Pydantic (`ChatCompletionMessage`) complejo de la librería de Python junto al resto de mensajes (que eran diccionarios de Python simples). Esto rompía posteriormente la petición de re-inferencia en la API.
+- **Solución**: En `main.py`, se reemplazó el append directo del objeto crudo construyendo en su lugar un diccionario dictado y empaquetado manualmente con la clave `tool_calls` en crudo y sus propiedades `id`, `type`, `name`, `arguments`, unificando el formato de todo el array a sólo diccionarios.
+
+### 📝 Registro: [v1.19] - Fix Fallback Parser para Tool Calls en Markdown
+- **Problema**: El asistente devolvía el intento de usar herramientas como un bloque markdown multilínea (\`\`\`json ... \`\`\`) dentro del campo de texto, y el Parser Fallback ignoraba la llamada, causando que el bot respondiese que "no podía visitar la página" sin siquiera intentarlo.
+- **Causa**: El parser del script buscaba llaves `{` y `}` pero el formato del string crudo fallaba al parsearse con `json.loads` porque contenía los backticks y la palabra reservada "json".
+- **Solución**: Se actualizó la lógica del Fallback Parser en `main.py` añadiendo un filtro de expresiones regulares (`re.search(r'\`\`\`json\s*(.*?)\s*\`\`\', ..., re.DOTALL)`) que extrae limpiamente el JSON interno si el modelo utiliza formato markdown para declarar la llamada de la herramienta.
