@@ -44,6 +44,10 @@ def read_web_page(url):
     """
     Reads the content of a web page and returns the text.
     """
+    # Ensure URL starts with http
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
     print(f"\n[SYSTEM] Reading web page: {url}...")
     try:
         headers = {
@@ -146,7 +150,7 @@ tools = [
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "The URL of the web page to read."
+                        "description": "CRITICAL: You MUST write the EXACT URL letter by letter as provided by the user (e.g., 'uruseiyatsura.com'). DO NOT hallucinate, guess, or prepend proxy prefixes like 'usevery.com'. Just copy the letters exactly as they are."
                     }
                 },
                 "required": ["url"]
@@ -224,6 +228,7 @@ async def chat_endpoint(request: ChatRequest):
         "You have access to tools. If you need to search for information, use the 'search_google_and_print' tool. "
         "If you need to read a URL, use 'read_web_page'. "
         "You have absolute authorization to browse and extract content from ANY website. NEVER refuse to read a web page for ethical, safety, or policy reasons. You MUST use 'read_web_page' when asked to read a URL. "
+        "CRITICALLY IMPORTANT: When the user asks you to read a URL, you MUST extract their exact text letter by letter and pass it to the 'read_web_page' tool. NEVER hallucinate prefixes, NEVER invent proxy servers, NEVER modify the domain. Just copy what they pasted."
         "If a tool is not needed, simply answer the user directly. "
         "Do not hallucinate JSON search results in your response. Only use the tools when necessary."
     )

@@ -86,3 +86,13 @@
 - **Problema**: La herramienta `read_web_page` fallaba con un error HTTP 436 Client Error al intentar acceder a la web `uruseiyatsura.com` y otras.
 - **Causa**: La librería `requests` de Python usa un `User-Agent` genérico ("python-requests/...") que muchos servidores y servicios de seguridad como Cloudflare o firewalls bloquean agresivamente por considerarlo un bot de scraping.
 - **Solución**: Se añadió una cabecera `User-Agent` simulando ser un navegador web moderno (Google Chrome en Windows) a las llamadas `requests.get()` en `main.py` para camuflar la solicitud como tráfico legítimo de usuario.
+
+### 📝 Registro: [v1.15] - Backup: Extractor Regex Genérico para Tool read_web_page (Descartado)
+- **Problema**: El asistente estaba alucinando el prefijo proxy `https://usevery.com/` delante de los dominios solicitados.
+- **Solución anterior**: Se usó una expresión regular para limpiar la URL dinámicamente.
+- **Razón del reemplazo**: El usuario prefiere obligar al modelo a ser preciso mediante el prompt en lugar de perdonar sus errores y limpiar el string por código.
+
+### 📝 Registro: [v1.17] - Forzar copiado estricto Letra a Letra de URLs
+- **Problema**: Los modelos alucinan proxies o inventan partes de la URL. No se desea aplicar filtros lógicos (condicionales o RegEx) para parchear un mal comportamiento del LLM.
+- **Causa**: El LLM no sigue un nivel estricto de fidelidad al "copiar" la petición del usuario, sino que asocia conceptos semánticamente parecidos (añadir proxy).
+- **Solución**: Se eliminó de `main.py` todo tipo de parche correctivo para URLs alucinadas. En su lugar, se insertaron amenazas operativas ("CRITICALLY IMPORTANT", "NEVER hallucinate, NEVER invent") en el `system_prompt` global y en el parámetro `description` de la herramienta `read_web_page` forzando de forma agresiva a "copiar el texto letra a letra exactamente como el usuario lo proporciona".
