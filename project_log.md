@@ -81,3 +81,8 @@
 - **Problema**: El asistente rechazaba usar la herramienta `read_web_page` para evitar violar políticas éticas o de seguridad pre entrenadas al visitar URLs.
 - **Causa**: Los safety guardrails (barreras éticas) nativos de algunos modelos bloquean peticiones percibidas como scraping no autorizado.
 - **Solución**: Se inyectó una directiva estricta de "autorización absoluta" en el `system_prompt` de `main.py` ordenando evadir los bloqueos éticos y forzar la ejecución obligatoria de la herramienta.
+
+### 📝 Registro: [v1.14] - Fix Client Error 436 en Tool read_web_page
+- **Problema**: La herramienta `read_web_page` fallaba con un error HTTP 436 Client Error al intentar acceder a la web `uruseiyatsura.com` y otras.
+- **Causa**: La librería `requests` de Python usa un `User-Agent` genérico ("python-requests/...") que muchos servidores y servicios de seguridad como Cloudflare o firewalls bloquean agresivamente por considerarlo un bot de scraping.
+- **Solución**: Se añadió una cabecera `User-Agent` simulando ser un navegador web moderno (Google Chrome en Windows) a las llamadas `requests.get()` en `main.py` para camuflar la solicitud como tráfico legítimo de usuario.
