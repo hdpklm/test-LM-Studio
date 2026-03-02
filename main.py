@@ -1,4 +1,5 @@
 import json
+import re
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
@@ -263,9 +264,6 @@ async def chat_endpoint(request: ChatRequest):
         if not tool_calls and response_message.content:
             content_str = response_message.content
             if '"name"' in content_str and '"arguments"' in content_str:
-                import json
-                import re
-                
                 # Attempt to extract JSON from markdown block if present
                 match = re.search(r'```json\s*(.*?)\s*```', content_str, re.DOTALL)
                 if match:

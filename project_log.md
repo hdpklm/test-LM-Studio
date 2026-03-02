@@ -121,3 +121,8 @@
 - **Problema**: Ciertas páginas (como jsonwise.com) devolvían un error `SSLCertVerificationError` causando que la herramienta fallase porque el certificado de la web no concuerda con su hostname.
 - **Causa**: La librería `requests` de Python por defecto bloquea de forma estricta cualquier petición HTTPS donde el certificado SSL esté caducado, mal configurado o no corresponda perfectamente con el dominio, arrojando una excepción severa.
 - **Solución**: Se añadió en `main.py` el parámetro `verify=False` a la función `requests.get` habilitando conexiones inseguras como fallback, y se importó `urllib3` para ignorar los falsos positivos de advertencia por consola (`InsecureRequestWarning`), asegurando que siempre lea la web ignorando fallos administrativos del host remoto.
+
+### 📝 Registro: [v1.23] - Fix Crash por UnboundLocalError de json
+- **Problema**: Tras el envío inicial de un requerimiento normal usando tool_calls nativos, el servidor petaba con `Error: local variable 'json' referenced before assignment` provocando un Error 500.
+- **Causa**: En el código de Fallback de versiones anteriores se había instanciado un `import json` de forma local dentro del bloque `if`. Python evalúa variables a nivel de toda la función en tiempo de compilación; al no entrar en el if porque era un tool_call normal, la variable local quedaba sin asignar, ahogando al `import global` de la línea 1.
+- **Solución**: Se eliminaron las importaciones tardías locales y se movieron `import json` e `import re` exclusiva y globalmente al principio del archivo `main.py` para asegurar que todo el script tenga acceso al módulo de serialización sin problemas de Scope.
