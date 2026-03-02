@@ -1,4 +1,4 @@
-# Estado del Proyecto (v1.12)
+# Estado del Proyecto (v1.13)
 
 ## Main Project
 
@@ -12,7 +12,7 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 ### Sección de archivos de código
 
 - **`test-LM-Studio/main.py`**
-	- Descripción: Servidor FastAPI Backend para el chat (v1.12).
+	- Descripción: Servidor FastAPI Backend para el chat (v1.13).
 	- Endpoints:
 		- `POST /api/chat`: Parámetros en body JSON. Devuelve: `JSON` con la respuesta del LLM y tool calls.
 		- `GET /api/history`: Devuelve: `JSON` array con la lista de conversaciones.
