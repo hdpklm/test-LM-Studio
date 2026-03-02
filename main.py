@@ -308,15 +308,7 @@ async def chat_endpoint(request: ChatRequest):
                         # Creamos la versión en dict de la respuesta vacía con herramientas
                         response_message_dict = {
                             "role": "assistant",
-                            "content": None,
-                            "tool_calls": [{
-                                "id": "call_fallback",
-                                "type": "function",
-                                "function": {
-                                    "name": parsed_tc["name"],
-                                    "arguments": parsed_tc["arguments"] if isinstance(parsed_tc["arguments"], str) else json.dumps(parsed_tc["arguments"])
-                                }
-                            }]
+                            "content": response_message.content
                         }
                     except Exception as e:
                         print(f"\n[DEBUG] Error preparando fallback tool call: {e}")
@@ -325,8 +317,10 @@ async def chat_endpoint(request: ChatRequest):
         if tool_calls:
             print(f"\n[RAW TOOL CALL] Model requested:\n{tool_calls}\n")
             # Agregamos la versión dict si se usó fallback, de lo contrario la normal
+            is_fallback = False
             if response_message_dict:
                 messages.append(response_message_dict)
+                is_fallback = True
             else:
                 # Construir manualmente el dict nativo para evitar crashes de serialización
                 tool_calls_list = []
@@ -357,12 +351,18 @@ async def chat_endpoint(request: ChatRequest):
                 elif function_name == "deep_thinking":
                     function_response = deep_thinking(prompt=function_args.get("prompt"))
                 
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": function_name,
-                    "content": function_response or ""
-                })
+                if is_fallback:
+                    messages.append({
+                        "role": "user",
+                        "content": f"[SYSTEM: The tool '{function_name}' returned the following result.]\n\n{function_response}\n\n[SYSTEM: Please provide your final answer to the user based on this result.]"
+                    })
+                else:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": function_name,
+                        "content": function_response or ""
+                    })
             
             second_response = client.chat.completions.create(
                 model="model-identifier",
