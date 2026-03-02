@@ -106,3 +106,18 @@
 - **Problema**: El asistente devolvía el intento de usar herramientas como un bloque markdown multilínea (\`\`\`json ... \`\`\`) dentro del campo de texto, y el Parser Fallback ignoraba la llamada, causando que el bot respondiese que "no podía visitar la página" sin siquiera intentarlo.
 - **Causa**: El parser del script buscaba llaves `{` y `}` pero el formato del string crudo fallaba al parsearse con `json.loads` porque contenía los backticks y la palabra reservada "json".
 - **Solución**: Se actualizó la lógica del Fallback Parser en `main.py` añadiendo un filtro de expresiones regulares (`re.search(r'\`\`\`json\s*(.*?)\s*\`\`\', ..., re.DOTALL)`) que extrae limpiamente el JSON interno si el modelo utiliza formato markdown para declarar la llamada de la herramienta.
+
+### 📝 Registro: [v1.20] - Fix Ruido de Etiquetas TOOL_RESULT en Salida Final
+- **Problema**: Tras procesarse con éxito la herramienta, la respuesta final conversacional que el bot emitía al usuario llegaba ensuciada con bloques de texto como `[TOOL_RESULT]texto aqui[/TOOL_RESULT]`.
+- **Causa**: Modelos como Gemma tienen la costumbre de verbalizar el ciclo de herramientas usando unos pseudo tags de marcado que no forman parte de la respuesta natural deseada hacia el usuario en la interfaz final.
+- **Solución**: Se aplicó una limpieza a la cadena `final_content` en `main.py` para hacer un `replace()` automático de `[TOOL_RESULT]` y `[END_TOOL_RESULT]` antes de devolver el JSON de la API al cliente frontend.
+
+### 📝 Registro: [v1.21] - Mejora de Extracción de Texto en Tool read_web_page
+- **Problema**: A veces la herramienta leía la página web pero devolvía que no había contenido ("No readable text found on page") aunque la web sí tuviese texto.
+- **Causa**: El parser de BeautifulSoup estaba programado de forma muy restrictiva (`soup.find_all('p')`), extrayendo únicamente párrafos. En webs modernas el texto suele estar dentro de `<div>`, `<span>` o etiquetas semánticas, por lo que el script fallaba en encontrarlo.
+- **Solución**: Se reemplazó la extracción estricta por un filtrado de purga (`decompose()`) de los scripts, estilos y menús de navegación. Tras limpiar el código basura, se hace un `get_text()` global de toda la página, lo que garantiza capturar todo el texto visible sin importar el marcado HTML.
+
+### 📝 Registro: [v1.22] - Fix Error de Verificación de Certificados SSL
+- **Problema**: Ciertas páginas (como jsonwise.com) devolvían un error `SSLCertVerificationError` causando que la herramienta fallase porque el certificado de la web no concuerda con su hostname.
+- **Causa**: La librería `requests` de Python por defecto bloquea de forma estricta cualquier petición HTTPS donde el certificado SSL esté caducado, mal configurado o no corresponda perfectamente con el dominio, arrojando una excepción severa.
+- **Solución**: Se añadió en `main.py` el parámetro `verify=False` a la función `requests.get` habilitando conexiones inseguras como fallback, y se importó `urllib3` para ignorar los falsos positivos de advertencia por consola (`InsecureRequestWarning`), asegurando que siempre lea la web ignorando fallos administrativos del host remoto.

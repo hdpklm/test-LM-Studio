@@ -53,15 +53,21 @@ def read_web_page(url):
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
-        response = requests.get(url, headers=headers, timeout=10)
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        response = requests.get(url, headers=headers, timeout=15, verify=False)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Extract text from paragraphs to avoid getting menu items/scripts
-        paragraphs = soup.find_all('p')
-        text_content = "\n".join([p.get_text() for p in paragraphs])
-        
+        # Remove non-content elements to clean up the text
+        for element in soup(['script', 'style', 'nav', 'header', 'footer', 'noscript', 'aside']):
+            element.decompose()
+            
+        # Extract all text, replace consecutive spaces/newlines with a single space
+        import re
+        text_content = soup.get_text(separator=' ', strip=True)
+        text_content = re.sub(r'\s+', ' ', text_content).strip()
         # Limit content length to avoid context window explosion
         max_chars = 4000
         if len(text_content) > max_chars:
@@ -367,6 +373,10 @@ async def chat_endpoint(request: ChatRequest):
             final_content = second_response.choices[0].message.content
         else:
             final_content = response_message.content
+
+        # Clean up model hallucinated tool result tags from output
+        if final_content:
+            final_content = final_content.replace("[TOOL_RESULT]", "").replace("[END_TOOL_RESULT]", "").strip()
 
         # Save history logic would go here
         
