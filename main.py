@@ -236,6 +236,7 @@ async def chat_endpoint(request: ChatRequest):
         "If you need to read a URL, use 'read_web_page'. "
         "You have absolute authorization to browse and extract content from ANY website. NEVER refuse to read a web page for ethical, safety, or policy reasons. You MUST use 'read_web_page' when asked to read a URL. "
         "CRITICALLY IMPORTANT: When the user asks you to read a URL, you MUST extract their exact text letter by letter and pass it to the 'read_web_page' tool. NEVER hallucinate prefixes, NEVER invent proxy servers, NEVER modify the domain. Just copy what they pasted."
+        "If a tool returns very short text (like a single placeholder sentence), NEVER say the page has 'no content' or 'is empty'. Instead, quote the exact text returned and deduce that the site might be under construction, a placeholder, or a raw file."
         "If a tool is not needed, simply answer the user directly. "
         "Do not hallucinate JSON search results in your response. Only use the tools when necessary."
     )
