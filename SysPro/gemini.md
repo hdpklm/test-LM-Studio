@@ -143,10 +143,10 @@ Las ideas descartadas van a la sección `# Backup` al final de `project_log.md` 
 
 ---
 
-## 🧪 ARCHIVOS DE TEST
-
-- Todos los archivos de prueba van **exclusivamente** en: `gemini_test/{nombre-de-seccion}/`
-- No los borres tras probarlos. Pueden reutilizarse.
+## 🧪 ARCHIVOS DE TEST Y SCRIPTS TEMPORALES (REGLA ESTRICTA E IRROMPIBLE)
+- **PROHIBIDO** crear scripts temporales, experimentos rápidos o archivos "throwaway" (ej. `test_algo.py`, `script.py`) en la raíz del proyecto.
+- **TODA** prueba, por más pequeña o efímera que sea, tiene que crearse **exclusivamente** dentro de: `gemini_test/{nombre-de-seccion}/{nombre-de-archivo}`
+- **NUNCA** borres los archivos de prueba ni uses comandos como `del` o `rm` tras ejecutarlos. El historial completo de experimentos debe conservarse siempre. Infringir esto es un error crítico.
 
 ---
 
