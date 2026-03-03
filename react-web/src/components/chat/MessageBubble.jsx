@@ -6,11 +6,11 @@ import { User, Bot } from 'lucide-react';
 // Custom components passed to ReactLive scope
 const scope = { React };
 
-const MessageBubble = ({ message }) => {
+const MessageBubble = ({ message, msgIndex }) => {
 	const isUser = message.role === 'user' || message.role === 'User';
 
 	return (
-		<div className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
+		<div data-message-index={msgIndex} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
 			<div className={`flex max-w-[85%] gap-4 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
 				{/* Avatar */}
 				<div className={`flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center mt-1 ${isUser ? 'bg-zinc-700' : 'bg-[#f4ba3e]/20 text-[#f4ba3e]'
@@ -132,4 +132,4 @@ const MessageBubble = ({ message }) => {
 	);
 };
 
-export default MessageBubble;
+export default React.memo(MessageBubble);

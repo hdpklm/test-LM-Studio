@@ -11,7 +11,8 @@ const ChatArea = () => {
 	const [isLoading, setIsLoading] = useState(false);
 	const [uploading, setUploading] = useState(false);
 	const [selectionData, setSelectionData] = useState(null);
-	const [quotedContent, setQuotedContent] = useState(null);
+	const [activeQuotes, setActiveQuotes] = useState([]);
+	const [highlightRects, setHighlightRects] = useState([]);
 	const fileInputRef = useRef(null);
 	const messagesEndRef = useRef(null);
 	const chatContainerRef = useRef(null);
@@ -25,6 +26,7 @@ const ChatArea = () => {
 			let text = '';
 			let rect = null;
 			let range = null;
+			let msgIndex = null;
 
 			// Handle input/textarea selection (like LiveEditor inside React Live)
 			const activeEl = document.activeElement;
@@ -40,6 +42,9 @@ const ChatArea = () => {
 					};
 					// Fake range obj to bypass range clone needs later
 					range = 'textarea_fake_range';
+
+					const containerNode = activeEl.closest('[data-message-index]');
+					if (containerNode) msgIndex = parseInt(containerNode.getAttribute('data-message-index'));
 				}
 			} else {
 				// Regular document selection
@@ -51,6 +56,8 @@ const ChatArea = () => {
 						// Usa commonAncestorContainer para revisar si está en el chat container
 						if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
 							rect = range.getBoundingClientRect();
+							const containerNode = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode.closest('[data-message-index]') : range.commonAncestorContainer.closest('[data-message-index]');
+							if (containerNode) msgIndex = parseInt(containerNode.getAttribute('data-message-index'));
 						} else {
 							text = ''; // No pertenece al chat
 						}
@@ -70,7 +77,8 @@ const ChatArea = () => {
 					text: text,
 					top: rect.bottom + 10,
 					left: rect.left + (rect.width / 2) - 16,
-					range: range
+					range: range,
+					msgIndex: msgIndex
 				});
 			} else {
 				setSelectionData(null);
@@ -117,13 +125,36 @@ const ChatArea = () => {
 	const handleAddToInput = () => {
 		if (selectionData?.text && inputRef.current) {
 			const currentCount = quoteCounter.current++;
+			const quoteId = `quote-${currentCount}`;
+
+			let start = -1;
+			let stop = -1;
+			if (selectionData.msgIndex !== null && messages[selectionData.msgIndex]) {
+				const rawText = messages[selectionData.msgIndex].content;
+				start = rawText.indexOf(selectionData.text);
+				if (start !== -1) {
+					stop = start + selectionData.text.length;
+				}
+			}
+
+			// Guardar referencia activa local
+			const newQuote = {
+				id: quoteId,
+				range: selectionData.range !== 'textarea_fake_range' ? selectionData.range.cloneRange() : 'textarea_fake_range',
+				msgIndex: selectionData.msgIndex,
+				isBlinking: false
+			};
+			setActiveQuotes(prev => [...prev, newQuote]);
+
+			const payload = `selected(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${start}, ${stop})`;
+
 			// Crear el nodo HTML del badge (pequeño, 1 línea, sin mostrar el texto adentro)
-			const badgeHtml = `<span contenteditable="false" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-default align-baseline select-none">
-				<span>sel-${currentCount}</span>
-				<span class="hover:text-red-400 cursor-pointer p-0.5 ml-0.5 flex items-center justify-center" onclick="this.parentElement.remove()">
-					<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-				</span>
-			</span>&#8203;`;
+			const badgeHtml = `<span contenteditable="false" data-quote-id="${quoteId}" data-quote-payload="${payload}" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" onclick="window.dispatchEvent(new CustomEvent('blink-quote', {detail: '${quoteId}'}))" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-pointer align-baseline select-none">
+					<span>sel-${currentCount}</span>
+					<span class="hover:text-red-400 cursor-pointer p-0.5 ml-0.5 flex items-center justify-center" onclick="event.stopPropagation(); this.parentElement.remove(); window.dispatchEvent(new Event('input'))">
+						<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+					</span>
+				</span>&#8203;`;
 
 			// Restore selection if exists and belongs to the input
 			inputRef.current.focus();
@@ -152,6 +183,77 @@ const ChatArea = () => {
 	useEffect(() => {
 		scrollToBottom();
 	}, [messages]);
+
+	// Highlight Rectangles engine
+	useEffect(() => {
+		const updateRects = () => {
+			if (!chatContainerRef.current) return;
+			const containerRect = chatContainerRef.current.getBoundingClientRect();
+			const newRects = [];
+			activeQuotes.forEach(quote => {
+				if (quote.range === 'textarea_fake_range') {
+					// Fallback highlight for Code Blocks (LiveEditor Textareas)
+					const msgEl = chatContainerRef.current.querySelector(`[data-message-index="${quote.msgIndex}"]`);
+					if (msgEl) {
+						const r = msgEl.getBoundingClientRect();
+						newRects.push({
+							id: quote.id,
+							isBlinking: quote.isBlinking,
+							top: r.top - containerRect.top + chatContainerRef.current.scrollTop,
+							left: r.left - containerRect.left,
+							width: r.width,
+							height: r.height,
+							isFallback: true
+						});
+					}
+				} else {
+					try {
+						const rects = Array.from(quote.range.getClientRects() || []);
+						rects.forEach(r => {
+							if (r.width > 0 && r.height > 0) {
+								newRects.push({
+									id: quote.id,
+									isBlinking: quote.isBlinking,
+									top: r.top - containerRect.top + chatContainerRef.current.scrollTop,
+									left: r.left - containerRect.left,
+									width: r.width,
+									height: r.height,
+									isFallback: false
+								});
+							}
+						});
+					} catch (e) {
+						// disconnected range or invalid
+					}
+				}
+			});
+			setHighlightRects(newRects);
+		};
+
+		updateRects();
+		const container = chatContainerRef.current;
+		if (container) {
+			container.addEventListener('scroll', updateRects);
+			window.addEventListener('resize', updateRects);
+		}
+		return () => {
+			if (container) container.removeEventListener('scroll', updateRects);
+			window.removeEventListener('resize', updateRects);
+		}
+	}, [activeQuotes]);
+
+	// Evento de blink
+	useEffect(() => {
+		const blinkHandler = (e) => {
+			const id = e.detail;
+			setActiveQuotes(prev => prev.map(q => q.id === id ? { ...q, isBlinking: true } : q));
+			setTimeout(() => {
+				setActiveQuotes(prev => prev.map(q => q.id === id ? { ...q, isBlinking: false } : q));
+			}, 800);
+		};
+		window.addEventListener('blink-quote', blinkHandler);
+		return () => window.removeEventListener('blink-quote', blinkHandler);
+	}, []);
 
 	// Load history if currentChatId changes by user explicitly
 	useEffect(() => {
@@ -201,6 +303,7 @@ const ChatArea = () => {
 		setInput('');
 		if (inputRef.current) inputRef.current.innerHTML = '';
 		setSelectionData(null);
+		setActiveQuotes([]); // Clear highlights
 		setIsLoading(true);
 
 		try {
@@ -296,8 +399,17 @@ const ChatArea = () => {
 				ref={chatContainerRef}
 				className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin relative pb-32"
 			>
+				{/* Background Highlights for Active Quotes */}
+				{highlightRects.map((r, i) => (
+					<div
+						key={i}
+						className={`absolute pointer-events-none transition-all duration-300 ${r.isFallback ? (r.isBlinking ? 'bg-yellow-400/20 border-l-4 border-yellow-400 animate-pulse' : 'bg-yellow-500/5 border-l-4 border-yellow-500/50') : (r.isBlinking ? 'bg-yellow-400/80 saturate-200 mix-blend-screen animate-pulse' : 'bg-yellow-500/30 mix-blend-screen')}`}
+						style={{ top: r.top, left: r.left, width: r.width, height: r.height, zIndex: 0 }}
+					/>
+				))}
+
 				{messages.length === 0 ? (
-					<div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
+					<div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4 relative z-10">
 						<div className="w-16 h-16 rounded-2xl bg-[#f4ba3e]/10 flex items-center justify-center">
 							<Menu className="w-8 h-8 text-[#f4ba3e]" />
 						</div>
@@ -305,7 +417,7 @@ const ChatArea = () => {
 					</div>
 				) : (
 					messages.map((msg, index) => (
-						<MessageBubble key={index} message={msg} />
+						<MessageBubble key={index} message={msg} msgIndex={index} />
 					))
 				)}
 				{isLoading && (
@@ -354,6 +466,11 @@ const ChatArea = () => {
 								onInput={(e) => {
 									setInput(e.currentTarget.innerHTML);
 									saveSelection();
+									// Sync active badges deletions
+									if (inputRef.current) {
+										const presentIds = Array.from(inputRef.current.querySelectorAll('[data-quote-id]')).map(n => n.getAttribute('data-quote-id'));
+										setActiveQuotes(prev => prev.filter(q => presentIds.includes(q.id)));
+									}
 								}}
 								onKeyUp={saveSelection}
 								onMouseUp={saveSelection}
