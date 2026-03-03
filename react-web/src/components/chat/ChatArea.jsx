@@ -12,7 +12,6 @@ const ChatArea = () => {
 	const [uploading, setUploading] = useState(false);
 	const [selectionData, setSelectionData] = useState(null);
 	const [quotedContent, setQuotedContent] = useState(null);
-	const [highlightRects, setHighlightRects] = useState([]);
 	const fileInputRef = useRef(null);
 	const messagesEndRef = useRef(null);
 	const chatContainerRef = useRef(null);
@@ -77,31 +76,27 @@ const ChatArea = () => {
 		};
 	}, []);
 
+	const inputRef = useRef(null);
+
 	const handleAddToInput = () => {
-		if (selectionData?.text && selectionData.range && chatContainerRef.current) {
-			setQuotedContent(selectionData.text);
+		if (selectionData?.text && inputRef.current) {
+			// Crear el nodo HTML del badge
+			const badgeHtml = `<span contenteditable="false" class="inline-flex items-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-2 py-0.5 rounded-md text-sm mx-1 cursor-default align-middle group">
+				<span class="truncate max-w-[150px] inline-block" title="${selectionData.text.replace(/"/g, '&quot;')}">"${selectionData.text}"</span>
+				<span class="text-yellow-500/50 hover:text-red-400 cursor-pointer p-0.5 ml-1" onclick="this.parentElement.remove()">
+					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+				</span>
+			</span>&#8203;`;
 
-			// Calculate relative rects for highlighting
-			const range = selectionData.range;
-			const rects = Array.from(range.getClientRects());
-			const containerRect = chatContainerRef.current.getBoundingClientRect();
-			const scrollTop = chatContainerRef.current.scrollTop;
-			const scrollLeft = chatContainerRef.current.scrollLeft;
+			// Insertarlo en el contentEditable al final o en el cursor actual
+			inputRef.current.focus();
+			document.execCommand('insertHTML', false, badgeHtml);
 
-			const relativeRects = rects.map(r => ({
-				top: r.top - containerRect.top + scrollTop,
-				left: r.left - containerRect.left + scrollLeft,
-				width: r.width,
-				height: r.height
-			}));
+			// Forzar actualización del state aunque sea contentEditable
+			setInput(inputRef.current.innerHTML);
 
-			setHighlightRects(relativeRects);
 			setSelectionData(null);
 			window.getSelection().removeAllRanges();
-		} else if (selectionData?.text) {
-			// Fallback if range is missing
-			setQuotedContent(selectionData.text);
-			setSelectionData(null);
 		}
 	};
 
@@ -122,18 +117,41 @@ const ChatArea = () => {
 
 	const handleSend = async (e) => {
 		e?.preventDefault();
-		if ((!input.trim() && !quotedContent) || isLoading) return;
+		// Extract raw text and quotes for the backend
+		let finalContent = "";
+		if (inputRef.current) {
+			// Parsea el interior del contentEditable para convertir spans a formato texto
+			const tempDiv = document.createElement('div');
+			tempDiv.innerHTML = inputRef.current.innerHTML;
 
-		let finalContent = input;
-		if (quotedContent) {
-			finalContent = `> ${quotedContent}\n\n${input}`;
+			// Extraer cada nodo y montar el string final
+			Array.from(tempDiv.childNodes).forEach(node => {
+				if (node.nodeType === Node.TEXT_NODE) {
+					finalContent += node.textContent;
+				} else if (node.nodeType === Node.ELEMENT_NODE) {
+					if (node.tagName === 'SPAN' && node.classList.contains('inline-flex')) {
+						// Es un badge
+						const quoteText = node.querySelector('.truncate')?.textContent || node.textContent;
+						finalContent += `\n> ${quoteText}\n`;
+					} else if (node.tagName === 'DIV' || node.tagName === 'BR') {
+						finalContent += '\n' + node.textContent;
+					} else {
+						finalContent += node.textContent;
+					}
+				}
+			});
 		}
+
+		finalContent = finalContent.trim().replace(/\u200B/g, ''); // Fix zero-width chars
+
+		if (!finalContent && !input.trim() || isLoading) return;
 
 		const userMessage = { role: 'user', content: finalContent };
 		setMessages(prev => [...prev, userMessage]);
+
 		setInput('');
-		setQuotedContent(null);
-		setHighlightRects([]); // Clear highlights
+		if (inputRef.current) inputRef.current.innerHTML = '';
+		setSelectionData(null);
 		setIsLoading(true);
 
 		try {
@@ -146,8 +164,6 @@ const ChatArea = () => {
 			const assistantMessage = { role: 'assistant', content: response.data.response };
 			setMessages(prev => [...prev, assistantMessage]);
 
-			// En una implementación completa el backend enviaría un nuevo chatId si era una convnueva
-			// y actualizaríamos la lista. Aquí refrescamos por si hay nuevas convers.
 			fetchData();
 		} catch (error) {
 			console.error("Error sending message", error);
@@ -169,7 +185,6 @@ const ChatArea = () => {
 			const res = await axios.post('http://localhost:8000/api/upload', formData, {
 				headers: { 'Content-Type': 'multipart/form-data' }
 			});
-			// Add a system notification to chat about the upload
 			setMessages(prev => [...prev, {
 				role: 'system',
 				content: `*Archivo subido exitosamente: [${file.name}](http://localhost:8000/${res.data.path.replace(/\\/g, '/')})*`
@@ -178,7 +193,6 @@ const ChatArea = () => {
 			console.error("Error uploading", error);
 		} finally {
 			setUploading(false);
-			// Reset input
 			if (fileInputRef.current) fileInputRef.current.value = '';
 		}
 	};
@@ -188,7 +202,7 @@ const ChatArea = () => {
 			{/* Floating Action Button for Selection */}
 			{selectionData && (
 				<button
-					onMouseDown={(e) => e.preventDefault()} // Prevent focus loss/selection clear
+					onMouseDown={(e) => e.preventDefault()}
 					onClick={handleAddToInput}
 					style={{
 						position: 'fixed',
@@ -219,26 +233,8 @@ const ChatArea = () => {
 			{/* Messages Area */}
 			<div
 				ref={chatContainerRef}
-				className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin relative"
+				className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin relative pb-32"
 			>
-				{/* Highlight Overlays */}
-				{highlightRects.map((rect, i) => (
-					<div
-						key={i}
-						style={{
-							position: 'absolute',
-							top: rect.top,
-							left: rect.left,
-							width: rect.width,
-							height: rect.height,
-							backgroundColor: '#f4ba3e', // Yellow/Gold
-							opacity: 0.3,
-							pointerEvents: 'none', // Allow clicks to pass through
-							zIndex: 0 // Behind text if possible, but absolute usually is on top. Opacity helps.
-						}}
-					/>
-				))}
-
 				{messages.length === 0 ? (
 					<div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
 						<div className="w-16 h-16 rounded-2xl bg-[#f4ba3e]/10 flex items-center justify-center">
@@ -265,29 +261,9 @@ const ChatArea = () => {
 				<div ref={messagesEndRef} />
 			</div>
 
-			<div className="p-4 md:px-20 lg:px-40 xl:px-60 bg-gradient-to-t from-zinc-950 via-zinc-900 to-transparent">
+			{/* Input Area Editable */}
+			<div className="absolute bottom-0 w-full p-4 md:px-20 lg:px-40 xl:px-60 bg-gradient-to-t from-zinc-950 via-zinc-900 to-transparent">
 				<form onSubmit={handleSend} className="relative flex flex-col gap-2 bg-zinc-800 border-[1px] border-zinc-700/50 rounded-2xl p-2 transition-shadow focus-within:ring-2 focus-within:ring-[#f4ba3e]/50 focus-within:bg-zinc-800/80 shadow-lg">
-
-					{/* Badge de Cita (Quote) Superior dentro del Input */}
-					{quotedContent && (
-						<div className="mx-2 mt-2 bg-zinc-700/50 rounded-lg p-2 flex items-center justify-between animate-in slide-in-from-bottom-2 fade-in">
-							<div className="text-zinc-300 text-sm italic truncate border-l-4 border-[#f4ba3e] pl-3 flex-1">
-								"{quotedContent}"
-							</div>
-							<button
-								onClick={() => {
-									setQuotedContent(null);
-									setHighlightRects([]);
-								}}
-								className="text-zinc-400 hover:text-red-400 p-1 rounded-md hover:bg-zinc-600/50 transition-colors ml-2 shrink-0"
-								type="button"
-								title="Eliminar cita"
-							>
-								<X className="w-4 h-4" />
-							</button>
-						</div>
-					)}
-
 					<div className="flex items-end gap-2 w-full">
 						<input
 							type="file"
@@ -305,23 +281,30 @@ const ChatArea = () => {
 							<Paperclip className="w-5 h-5" />
 						</button>
 
-						<textarea
-							value={input}
-							onChange={(e) => setInput(e.target.value)}
-							onKeyDown={(e) => {
-								if (e.key === 'Enter' && !e.shiftKey) {
-									e.preventDefault();
-									handleSend();
-								}
-							}}
-							placeholder="Pregunta a LM-Studio..."
-							className="w-full max-h-48 min-h-[44px] bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-3 scrollbar-thin"
-							rows="1"
-						/>
+						<div className="relative w-full flex items-center min-h-[44px] cursor-text bg-transparent">
+							{!input && (
+								<div className="absolute left-0 text-zinc-500 pointer-events-none px-1">
+									Pregunta a LM-Studio...
+								</div>
+							)}
+							<div
+								ref={inputRef}
+								contentEditable
+								onInput={(e) => setInput(e.currentTarget.innerHTML)}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' && !e.shiftKey) {
+										e.preventDefault();
+										handleSend();
+									}
+								}}
+								className="w-full max-h-48 bg-transparent text-zinc-100 outline-none py-3 scrollbar-thin overflow-y-auto z-10 break-words empty:before:content-none whitespace-pre-wrap px-1"
+								suppressContentEditableWarning={true}
+							/>
+						</div>
 
 						<button
 							type="submit"
-							disabled={!input.trim() || isLoading}
+							disabled={!input.trim() || Boolean(isLoading)}
 							className={`p-3 rounded-xl transition-all shrink-0 ${!input.trim() || isLoading
 								? 'bg-zinc-700 text-zinc-500'
 								: 'bg-[#f4ba3e] text-zinc-950 hover:bg-[#dca331] shadow-[0_0_15px_rgba(244,186,62,0.3)]'

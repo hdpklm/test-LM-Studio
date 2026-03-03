@@ -160,3 +160,7 @@
 - **Causa**: El rediseño estructural de flexbox y la ubicación condicional del badge de "Quote" interrumpían la fluidez de flex-row del text-area de envío, y su posicionamiento absoluto estaba perdiendo clases relativas.
 - **Solución**: Se modificó el form contenedor en `ChatArea.jsx` a `flex-col`, moviendo el badge de cita al interior superior del text-area con un estilo de highlight integrado. Se aplicaron clases `shrink-0` a los iconos para que no colapsasen al inyectar texto.
 
+### 📝 Registro: [v1.30] - Múltiples Citas In-line (ContentEditable)
+- **Problema**: El textbox no permitía introducir más de un badge de cita, y el badge estaba atado al input genérico apareciendo siempre de primero, rompiendo la experiencia de intercalar citas durante la redacción.
+- **Causa**: `<textarea>` de HTML no soporta la inyección de nodos/elementos HTML interactivos y todo el diseño descansaba sobre un Render Condicional superior que estorbaba.
+- **Solución**: Se reemplazó el `<textarea>` del `ChatArea.jsx` por un `<div>` con la propiedad `contentEditable`. Ahora al seleccionar texto y apretar el botón de Add To Input, se inyecta un badge dinámico (`span` con clases de Tailwind amarillas) directamente en la posición de texto deseada (o al final) del cuadro de chat. Al enviar, un parser virtual extrae los nodos de texto y formatea los tags amarillos temporalmente visuales en citas literales Markdown `> [texto]` para pasárselo al backend limpiamente.
