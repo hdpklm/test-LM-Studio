@@ -240,3 +240,8 @@
 - **Problema**: La string literal interna `__cite__` heredada de la v1.42 estaba siendo absorbida accidentalmente por el propio parser `ReactMarkdown` como una solicitud legítima de Bold text (Negrita), transformando de mutuo propio la macroestructura a tags HTML `<strong>cite</strong>`.
 - **Causa**: Los dobles guiones bajos (`__`) son operadores reservados del lenguaje universal Markdown para aplicar énfasis visuales (bold).
 - **Solución**: Reemplazada categóricamente la palabra de invocación nativa por `[cite]`, resultando en la macro `´´´[cite](msgId, occurrence, start, stop)>texto´´´` convirtiéndola en una secuencia gramatical invisible e inmune a las transformaciones core del parseador DOM conversacional.
+
+### 📝 Registro: [v1.44] - Trim Espacial Dinámico
+- **Problema**: El capturador nativo de selecciones del navegador web capturaba espacios en blanco adicionales que el usuario arrastraba de más sin querer (ej. `"   hola  "`), ocasionando que el badge ocupara innecesario ancho de pantalla e iluminara huecos en el diseño.
+- **Causa**: Limitación técnica del cursor general del sistema.
+- **Solución**: Un algorítmo matemático auto-trim `while` en cascada inyectado sobre `ChatArea.jsx`. Cuando el usuario levanta el click (mouseup) analiza si en el `rawText` de la posición original las letras correspondientes a `start` y `stop` equivalen a vacíos (`\\s`). De ser así, aprieta los punteros hasta llegar al texto puro, acortando la selección final que emite hacia el badge.

@@ -171,6 +171,17 @@ const ChatArea = () => {
 
 				if (start !== -1) {
 					stop = start + selectionData.text.length;
+
+					// Magia Trim: Recortar espacios y ajustar coordenadas
+					while (start < stop && rawText[start] && !!rawText[start].match(/\s/)) {
+						start++;
+					}
+					while (stop > start && rawText[stop - 1] && !!rawText[stop - 1].match(/\s/)) {
+						stop--;
+					}
+
+					// Actualizar la string a mostrar para que no contenga los espacios
+					selectionData.text = rawText.substring(start, stop);
 				}
 			}
 
