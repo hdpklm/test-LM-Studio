@@ -12,6 +12,7 @@ const ChatArea = () => {
 	const [uploading, setUploading] = useState(false);
 	const [selectionData, setSelectionData] = useState(null);
 	const [activeQuotes, setActiveQuotes] = useState([]);
+	const [historicalQuotes, setHistoricalQuotes] = useState([]);
 	const [highlightRects, setHighlightRects] = useState([]);
 	const fileInputRef = useRef(null);
 	const messagesEndRef = useRef(null);
@@ -184,13 +185,44 @@ const ChatArea = () => {
 		scrollToBottom();
 	}, [messages]);
 
+	// Extract quotes from the chat history
+	useEffect(() => {
+		const newHist = [];
+		messages.forEach((msg, idx) => {
+			const regex = />\s*selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"([^"]+)"/g;
+			let match;
+			while ((match = regex.exec(msg.content)) !== null) {
+				const citedMsgId = parseInt(match[1]);
+				const textToFind = match[4].replace(/&quot;/g, '"');
+				if (!isNaN(citedMsgId)) {
+					newHist.push({ citedMsgId, text: textToFind, id: `hist-${idx}-${match.index}`, isBlinking: false });
+				}
+			}
+		});
+
+		// Wait briefly for DOM to render the new messages
+		setTimeout(() => {
+			if (!chatContainerRef.current) return;
+			const resolvedHist = newHist.map(q => {
+				const msgEl = chatContainerRef.current.querySelector(`[data-message-index="${q.citedMsgId}"]`);
+				if (msgEl) {
+					const range = createRangeForTextInNode(msgEl, q.text);
+					return { ...q, range: range || 'textarea_fake_range', msgIndex: q.citedMsgId };
+				}
+				return q;
+			});
+			setHistoricalQuotes(resolvedHist);
+		}, 100);
+	}, [messages]);
+
 	// Highlight Rectangles engine
 	useEffect(() => {
 		const updateRects = () => {
 			if (!chatContainerRef.current) return;
 			const containerRect = chatContainerRef.current.getBoundingClientRect();
 			const newRects = [];
-			activeQuotes.forEach(quote => {
+			const allQuotes = [...activeQuotes, ...historicalQuotes.filter(q => q.range)];
+			allQuotes.forEach(quote => {
 				if (quote.range === 'textarea_fake_range') {
 					// Fallback highlight for Code Blocks (LiveEditor Textareas)
 					const msgEl = chatContainerRef.current.querySelector(`[data-message-index="${quote.msgIndex}"]`);
@@ -240,7 +272,7 @@ const ChatArea = () => {
 			if (container) container.removeEventListener('scroll', updateRects);
 			window.removeEventListener('resize', updateRects);
 		}
-	}, [activeQuotes]);
+	}, [activeQuotes, historicalQuotes]);
 
 	// Evento de blink
 	useEffect(() => {
@@ -251,8 +283,19 @@ const ChatArea = () => {
 				setActiveQuotes(prev => prev.map(q => q.id === id ? { ...q, isBlinking: false } : q));
 			}, 800);
 		};
+		const blinkHistHandler = (e) => {
+			const { msgId, text } = e.detail;
+			setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text) ? { ...q, isBlinking: true } : q));
+			setTimeout(() => {
+				setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text) ? { ...q, isBlinking: false } : q));
+			}, 800);
+		};
 		window.addEventListener('blink-quote', blinkHandler);
-		return () => window.removeEventListener('blink-quote', blinkHandler);
+		window.addEventListener('blink-quote-history', blinkHistHandler);
+		return () => {
+			window.removeEventListener('blink-quote', blinkHandler);
+			window.removeEventListener('blink-quote-history', blinkHistHandler);
+		};
 	}, []);
 
 	// Load history if currentChatId changes by user explicitly
@@ -508,3 +551,43 @@ const ChatArea = () => {
 };
 
 export default ChatArea;
+
+// DOM Helper to safely hunt strings and transform them into coordinate rectangles
+function createRangeForTextInNode(node, text) {
+	let acc = "";
+	const textNodes = [];
+	const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
+	let n;
+	while (n = walker.nextNode()) {
+		textNodes.push({ node: n, start: acc.length, end: acc.length + n.nodeValue.length });
+		acc += n.nodeValue;
+	}
+
+	const startIndex = acc.indexOf(text);
+	if (startIndex === -1) return null;
+	const endIndex = startIndex + text.length;
+
+	let startNode, startOffset, endNode, endOffset;
+	for (const tn of textNodes) {
+		if (!startNode && startIndex >= tn.start && startIndex < tn.end) {
+			startNode = tn.node;
+			startOffset = startIndex - tn.start;
+		}
+		if (endIndex > tn.start && endIndex <= tn.end) {
+			endNode = tn.node;
+			endOffset = endIndex - tn.start;
+			break;
+		}
+	}
+	if (startNode && endNode) {
+		try {
+			const range = document.createRange();
+			range.setStart(startNode, startOffset);
+			range.setEnd(endNode, endOffset);
+			return range;
+		} catch (e) {
+			return null;
+		}
+	}
+	return null;
+}

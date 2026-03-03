@@ -37,8 +37,31 @@ const MessageBubble = ({ message, msgIndex }) => {
 										});
 										return text;
 									};
-									const rawText = getTextLines(children);
+									const rawText = getTextLines(children).trim();
 
+									// Fetch the pattern selected(id, start, stop) "text"
+									const match = rawText.match(/^selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"(.*)"$/s) ||
+										rawText.match(/^selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/s);
+
+									if (match) {
+										const msgId = match[1];
+										const quoteText = match[4] || "Cita extraída";
+										return (
+											<span
+												className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 py-0.5 rounded text-xs font-mono mb-1 mr-1 align-middle cursor-pointer"
+												title={quoteText}
+												onClick={() => {
+													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, text: quoteText } }));
+												}}
+											>
+												<span className="truncate max-w-[150px] inline-block font-sans text-xs italic">
+													"{quoteText}"
+												</span>
+											</span>
+										);
+									}
+
+									// Standard blockquote fallback
 									return (
 										<span className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 px-1.5 py-0.5 rounded textxs font-mono mb-1 mr-1 align-middle" title={rawText} {...props}>
 											<span className="truncate max-w-[100px] inline-block font-sans text-xs italic">
