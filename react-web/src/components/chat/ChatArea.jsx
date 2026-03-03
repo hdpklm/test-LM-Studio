@@ -77,6 +77,14 @@ const ChatArea = () => {
 
 	const inputRef = useRef(null);
 	const quoteCounter = useRef(1);
+	const savedRangeRef = useRef(null);
+
+	const saveSelection = () => {
+		const selection = window.getSelection();
+		if (selection.rangeCount > 0 && inputRef.current?.contains(selection.anchorNode)) {
+			savedRangeRef.current = selection.getRangeAt(0).cloneRange();
+		}
+	};
 
 	const handleAddToInput = () => {
 		if (selectionData?.text && inputRef.current) {
@@ -89,9 +97,19 @@ const ChatArea = () => {
 				</span>
 			</span>&#8203;`;
 
-			// Insertarlo en el contentEditable al final o en el cursor actual
+			// Restore selection if exists and belongs to the input
 			inputRef.current.focus();
+			if (savedRangeRef.current) {
+				const selection = window.getSelection();
+				selection.removeAllRanges();
+				selection.addRange(savedRangeRef.current);
+			}
+
+			// Insertarlo en el contentEditable al final o en el cursor actual
 			document.execCommand('insertHTML', false, badgeHtml);
+
+			// Update the saved range to be exactly after insertion
+			saveSelection();
 
 			// Forzar actualización del state aunque sea contentEditable
 			setInput(inputRef.current.innerHTML);
@@ -293,7 +311,13 @@ const ChatArea = () => {
 							<div
 								ref={inputRef}
 								contentEditable
-								onInput={(e) => setInput(e.currentTarget.innerHTML)}
+								onInput={(e) => {
+									setInput(e.currentTarget.innerHTML);
+									saveSelection();
+								}}
+								onKeyUp={saveSelection}
+								onMouseUp={saveSelection}
+								onBlur={saveSelection}
 								onKeyDown={(e) => {
 									if (e.key === 'Enter' && !e.shiftKey) {
 										e.preventDefault();

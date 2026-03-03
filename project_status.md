@@ -1,4 +1,4 @@
-# Estado del Proyecto (v1.31)
+# Estado del Proyecto (v1.32)
 
 ## Main Project
 
