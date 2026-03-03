@@ -22,29 +22,57 @@ const ChatArea = () => {
 
 	useEffect(() => {
 		const handleMouseUp = () => {
-			const selection = window.getSelection();
-			if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+			let text = '';
+			let rect = null;
+			let range = null;
+
+			// Handle input/textarea selection (like LiveEditor inside React Live)
+			const activeEl = document.activeElement;
+			if (activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT')) {
+				if (activeEl.selectionStart !== activeEl.selectionEnd) {
+					text = activeEl.value.substring(activeEl.selectionStart, activeEl.selectionEnd);
+					// Fallback rect for textareas (center top of the element roughly)
+					const elRect = activeEl.getBoundingClientRect();
+					rect = {
+						bottom: elRect.top + 20,
+						left: elRect.left + (elRect.width / 2),
+						width: 0
+					};
+					// Fake range obj to bypass range clone needs later
+					range = 'textarea_fake_range';
+				}
+			} else {
+				// Regular document selection
+				const selection = window.getSelection();
+				if (selection && !selection.isCollapsed && selection.toString().trim()) {
+					text = selection.toString();
+					try {
+						range = selection.getRangeAt(0);
+						// Usa commonAncestorContainer para revisar si está en el chat container
+						if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
+							rect = range.getBoundingClientRect();
+						} else {
+							text = ''; // No pertenece al chat
+						}
+					} catch (e) {
+						text = '';
+					}
+				}
+			}
+
+			if (!text.trim()) {
 				setSelectionData(null);
 				return;
 			}
 
-			// Verify selection is within chat container
-			// Use commonAncestorContainer to handle selections across nodes
-			try {
-				const range = selection.getRangeAt(0);
-				if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
-					const rect = range.getBoundingClientRect();
-
-					setSelectionData({
-						text: selection.toString(),
-						top: rect.bottom + 10,
-						left: rect.left + (rect.width / 2) - 16,
-						range: range.cloneRange() // Clone range to persist
-					});
-				} else {
-					setSelectionData(null);
-				}
-			} catch (e) {
+			if (rect) {
+				setSelectionData({
+					text: text,
+					top: rect.bottom + 10,
+					left: rect.left + (rect.width / 2) - 16,
+					range: range
+				});
+			} else {
 				setSelectionData(null);
 			}
 		};
@@ -223,8 +251,19 @@ const ChatArea = () => {
 			{/* Floating Action Button for Selection */}
 			{selectionData && (
 				<button
-					onMouseDown={(e) => e.preventDefault()}
-					onClick={handleAddToInput}
+					onMouseDown={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+					}}
+					onMouseUp={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+					}}
+					onClick={(e) => {
+						e.preventDefault();
+						e.stopPropagation();
+						handleAddToInput();
+					}}
 					style={{
 						position: 'fixed',
 						top: selectionData.top,
@@ -233,8 +272,9 @@ const ChatArea = () => {
 					}}
 					className="bg-[#f4ba3e] text-zinc-900 p-2 rounded-full shadow-lg hover:bg-[#dca331] transition-all animate-in fade-in zoom-in duration-200 hover:scale-110"
 					title="Citar en el chat"
+					type="button"
 				>
-					<MessageSquarePlus className="w-4 h-4" />
+					<MessageSquarePlus className="w-4 h-4 pointer-events-none" />
 				</button>
 			)}
 
