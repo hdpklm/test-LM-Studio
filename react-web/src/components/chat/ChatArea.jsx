@@ -59,9 +59,8 @@ const ChatArea = () => {
 
 		const handleMouseDown = (e) => {
 			// If clicking outside chat area and button, clear selection data
-			// (Simple heuristic)
 			if (selectionData && !e.target.closest('button')) {
-				// Don't clear immediately, let browser handle selection change
+				// Prevent default clearing if it's clicking on our custom action button
 			}
 		};
 
@@ -77,14 +76,16 @@ const ChatArea = () => {
 	}, []);
 
 	const inputRef = useRef(null);
+	const quoteCounter = useRef(1);
 
 	const handleAddToInput = () => {
 		if (selectionData?.text && inputRef.current) {
-			// Crear el nodo HTML del badge
-			const badgeHtml = `<span contenteditable="false" class="inline-flex items-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-200 px-2 py-0.5 rounded-md text-sm mx-1 cursor-default align-middle group">
-				<span class="truncate max-w-[150px] inline-block" title="${selectionData.text.replace(/"/g, '&quot;')}">"${selectionData.text}"</span>
-				<span class="text-yellow-500/50 hover:text-red-400 cursor-pointer p-0.5 ml-1" onclick="this.parentElement.remove()">
-					<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+			const currentCount = quoteCounter.current++;
+			// Crear el nodo HTML del badge (pequeño, 1 línea, sin mostrar el texto adentro)
+			const badgeHtml = `<span contenteditable="false" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-default align-baseline select-none">
+				<span>sel-${currentCount}</span>
+				<span class="hover:text-red-400 cursor-pointer p-0.5 ml-0.5 flex items-center justify-center" onclick="this.parentElement.remove()">
+					<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 				</span>
 			</span>&#8203;`;
 
@@ -96,7 +97,9 @@ const ChatArea = () => {
 			setInput(inputRef.current.innerHTML);
 
 			setSelectionData(null);
-			window.getSelection().removeAllRanges();
+			if (window.getSelection) {
+				window.getSelection().removeAllRanges();
+			}
 		}
 	};
 
@@ -130,8 +133,8 @@ const ChatArea = () => {
 					finalContent += node.textContent;
 				} else if (node.nodeType === Node.ELEMENT_NODE) {
 					if (node.tagName === 'SPAN' && node.classList.contains('inline-flex')) {
-						// Es un badge
-						const quoteText = node.querySelector('.truncate')?.textContent || node.textContent;
+						// Es un badge, extraemos de un data array en lugar de su innertext visual q es "sel-x"
+						const quoteText = node.getAttribute('data-quote-text') || node.textContent;
 						finalContent += `\n> ${quoteText}\n`;
 					} else if (node.tagName === 'DIV' || node.tagName === 'BR') {
 						finalContent += '\n' + node.textContent;
