@@ -27,6 +27,30 @@ const MessageBubble = ({ message }) => {
 					<div className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">
 						<ReactMarkdown
 							components={{
+								blockquote({ node, children, ...props }) {
+									// Extract text content from children
+									const getTextLines = (childArray) => {
+										let text = '';
+										React.Children.forEach(childArray, (child) => {
+											if (typeof child === 'string') text += child;
+											else if (child?.props?.children) text += getTextLines(child.props.children);
+										});
+										return text;
+									};
+									const rawText = getTextLines(children);
+
+									return (
+										<span className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 px-1.5 py-0.5 rounded textxs font-mono mb-1 mr-1 align-middle" title={rawText} {...props}>
+											<span className="truncate max-w-[100px] inline-block font-sans text-xs italic">
+												"{rawText}"
+											</span>
+										</span>
+									);
+								},
+								p({ node, children, ...props }) {
+									// ReactMarkdown usually wraps blockquotes in P or strings in P
+									return <p className="mb-2 last:mb-0 inline-block w-full" {...props}>{children}</p>;
+								},
 								code({ node, inline, className, children, ...props }) {
 									const match = /language-(\w+)/.exec(className || '');
 									const codeContent = String(children).replace(/\n$/, '');
@@ -34,7 +58,7 @@ const MessageBubble = ({ message }) => {
 									// React Live interpreter for jsx/tsx/react blocks
 									if (!inline && match && (match[1] === 'jsx' || match[1] === 'tsx' || match[1] === 'react')) {
 										return (
-											<div className="my-4 border border-zinc-700 rounded-lg overflow-hidden bg-zinc-950">
+											<div className="my-4 border border-zinc-700 rounded-lg overflow-hidden bg-zinc-950 block">
 												<div className="px-3 py-1 bg-zinc-800 text-xs text-zinc-400 font-mono flex justify-between items-center border-b border-zinc-700">
 													<span>React Preview</span>
 												</div>
@@ -55,7 +79,7 @@ const MessageBubble = ({ message }) => {
 
 									// Default code block
 									return !inline ? (
-										<div className="my-2 rounded-md overflow-hidden border border-zinc-700">
+										<div className="my-2 rounded-md overflow-hidden border border-zinc-700 block">
 											<div className="bg-zinc-800 text-zinc-400 px-3 py-1 text-xs font-mono">{match?.[1] || 'code'}</div>
 											<pre className="p-3 bg-zinc-950 overflow-x-auto text-sm">
 												<code className={className} {...props}>
@@ -72,7 +96,7 @@ const MessageBubble = ({ message }) => {
 								img({ node, src, alt }) {
 									// Support for displaying images in chat
 									return (
-										<img src={src} alt={alt} className="max-w-full rounded-lg border border-zinc-700 my-2 shadow-lg" loading="lazy" />
+										<img src={src} alt={alt} className="max-w-full rounded-lg border border-zinc-700 my-2 shadow-lg block" loading="lazy" />
 									);
 								},
 								a({ node, href, children }) {
