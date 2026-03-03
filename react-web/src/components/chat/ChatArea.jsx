@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { useChat } from '../../context/ChatContext';
 import MessageBubble from './MessageBubble';
-import { Send, Menu, Paperclip, FileCode2 } from 'lucide-react';
+import { Send, Menu, Paperclip, FileCode2, MessageSquarePlus, X } from 'lucide-react';
 
 const ChatArea = () => {
 	const { toggleLeftDrawer, toggleRightDrawer, currentChatId, setHistoryList, fetchData } = useChat();
@@ -10,11 +10,99 @@ const ChatArea = () => {
 	const [input, setInput] = useState('creame una pagina en react de login');
 	const [isLoading, setIsLoading] = useState(false);
 	const [uploading, setUploading] = useState(false);
+	const [selectionData, setSelectionData] = useState(null);
+	const [quotedContent, setQuotedContent] = useState(null);
+	const [highlightRects, setHighlightRects] = useState([]);
 	const fileInputRef = useRef(null);
 	const messagesEndRef = useRef(null);
+	const chatContainerRef = useRef(null);
 
 	const scrollToBottom = () => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	};
+
+	useEffect(() => {
+		const handleMouseUp = () => {
+			const selection = window.getSelection();
+			if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+				setSelectionData(null);
+				return;
+			}
+
+			// Verify selection is within chat container
+			// Use commonAncestorContainer to handle selections across nodes
+			try {
+				const range = selection.getRangeAt(0);
+				if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
+					const rect = range.getBoundingClientRect();
+					
+					setSelectionData({
+						text: selection.toString(),
+						top: rect.bottom + 10,
+						left: rect.left + (rect.width / 2) - 16,
+						range: range.cloneRange() // Clone range to persist
+					});
+				} else {
+					setSelectionData(null);
+				}
+			} catch (e) {
+				setSelectionData(null);
+			}
+		};
+
+		// Clear selection button if selection is cleared (e.g. clicking away)
+		// BUT only if we are NOT clicking the button itself (handled via preventDefault on button)
+		// Actually, let's remove the aggressive clearing on selectionchange since it causes issues
+		// We'll rely on global click listener or just re-evaluating on selectionchange but without clearing if non-empty?
+		// User reported "se deselecta el texto". This usually happens if focus is lost or a re-render happens.
+		// Let's just remove the selectionchange listener that clears data.
+		// Instead, we can clear when starting a new selection or clicking elsewhere.
+		
+		const handleMouseDown = (e) => {
+			// If clicking outside chat area and button, clear selection data
+			// (Simple heuristic)
+			if (selectionData && !e.target.closest('button')) {
+				// Don't clear immediately, let browser handle selection change
+			}
+		};
+
+		document.addEventListener('mouseup', handleMouseUp);
+		document.addEventListener('keyup', handleMouseUp); 
+		document.addEventListener('mousedown', handleMouseDown);
+		
+		return () => {
+			document.removeEventListener('mouseup', handleMouseUp);
+			document.removeEventListener('keyup', handleMouseUp);
+			document.removeEventListener('mousedown', handleMouseDown);
+		};
+	}, []);
+
+	const handleAddToInput = () => {
+		if (selectionData?.text && selectionData.range && chatContainerRef.current) {
+			setQuotedContent(selectionData.text);
+			
+			// Calculate relative rects for highlighting
+			const range = selectionData.range;
+			const rects = Array.from(range.getClientRects());
+			const containerRect = chatContainerRef.current.getBoundingClientRect();
+			const scrollTop = chatContainerRef.current.scrollTop;
+			const scrollLeft = chatContainerRef.current.scrollLeft;
+
+			const relativeRects = rects.map(r => ({
+				top: r.top - containerRect.top + scrollTop,
+				left: r.left - containerRect.left + scrollLeft,
+				width: r.width,
+				height: r.height
+			}));
+			
+			setHighlightRects(relativeRects);
+			setSelectionData(null);
+			window.getSelection().removeAllRanges();
+		} else if (selectionData?.text) {
+			// Fallback if range is missing
+			setQuotedContent(selectionData.text);
+			setSelectionData(null);
+		}
 	};
 
 	useEffect(() => {
@@ -34,16 +122,23 @@ const ChatArea = () => {
 
 	const handleSend = async (e) => {
 		e?.preventDefault();
-		if (!input.trim() || isLoading) return;
+		if ((!input.trim() && !quotedContent) || isLoading) return;
 
-		const userMessage = { role: 'user', content: input };
+		let finalContent = input;
+		if (quotedContent) {
+			finalContent = `> ${quotedContent}\n\n${input}`;
+		}
+
+		const userMessage = { role: 'user', content: finalContent };
 		setMessages(prev => [...prev, userMessage]);
 		setInput('');
+		setQuotedContent(null);
+		setHighlightRects([]); // Clear highlights
 		setIsLoading(true);
 
 		try {
 			const payload = {
-				message: input,
+				message: finalContent,
 				history_id: currentChatId
 			};
 			const response = await axios.post('http://localhost:8000/api/chat', payload);
@@ -89,7 +184,25 @@ const ChatArea = () => {
 	};
 
 	return (
-		<div className="flex flex-col h-screen w-full bg-zinc-900 transition-all">
+		<div className="flex flex-col h-screen w-full bg-zinc-900 transition-all relative">
+			{/* Floating Action Button for Selection */}
+			{selectionData && (
+				<button
+					onMouseDown={(e) => e.preventDefault()} // Prevent focus loss/selection clear
+					onClick={handleAddToInput}
+					style={{
+						position: 'fixed',
+						top: selectionData.top,
+						left: selectionData.left,
+						zIndex: 50
+					}}
+					className="bg-[#f4ba3e] text-zinc-900 p-2 rounded-full shadow-lg hover:bg-[#dca331] transition-all animate-in fade-in zoom-in duration-200 hover:scale-110"
+					title="Citar en el chat"
+				>
+					<MessageSquarePlus className="w-4 h-4" />
+				</button>
+			)}
+
 			{/* Header Mobile / Drawers Toggle */}
 			<div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950/50 backdrop-blur-sm z-10">
 				<button onClick={toggleLeftDrawer} className="p-2 -ml-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors">
@@ -104,7 +217,28 @@ const ChatArea = () => {
 			</div>
 
 			{/* Messages Area */}
-			<div className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin">
+			<div 
+				ref={chatContainerRef}
+				className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin relative"
+			>
+				{/* Highlight Overlays */}
+				{highlightRects.map((rect, i) => (
+					<div
+						key={i}
+						style={{
+							position: 'absolute',
+							top: rect.top,
+							left: rect.left,
+							width: rect.width,
+							height: rect.height,
+							backgroundColor: '#f4ba3e', // Yellow/Gold
+							opacity: 0.3,
+							pointerEvents: 'none', // Allow clicks to pass through
+							zIndex: 0 // Behind text if possible, but absolute usually is on top. Opacity helps.
+						}}
+					/>
+				))}
+
 				{messages.length === 0 ? (
 					<div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
 						<div className="w-16 h-16 rounded-2xl bg-[#f4ba3e]/10 flex items-center justify-center">
@@ -133,6 +267,22 @@ const ChatArea = () => {
 
 			{/* Input Area */}
 			<div className="p-4 md:px-20 lg:px-40 xl:px-60 bg-gradient-to-t from-zinc-950 via-zinc-900 to-transparent">
+				{quotedContent && (
+					<div className="mb-2 bg-zinc-800/80 border border-zinc-700/50 rounded-lg p-2 flex items-start justify-between backdrop-blur-sm animate-in slide-in-from-bottom-2 fade-in">
+						<div className="text-zinc-400 text-sm italic truncate border-l-2 border-[#f4ba3e] pl-2 max-w-[90%]">
+							"{quotedContent}"
+						</div>
+						<button 
+							onClick={() => {
+								setQuotedContent(null);
+								setHighlightRects([]);
+							}}
+							className="text-zinc-500 hover:text-red-400 p-1 rounded-md hover:bg-zinc-700/50 transition-colors"
+						>
+							<X className="w-4 h-4" />
+						</button>
+					</div>
+				)}
 				<form onSubmit={handleSend} className="relative flex items-end gap-2 bg-zinc-800 border-zinc-700/50 rounded-2xl p-2 transition-shadow focus-within:ring-2 focus-within:ring-[#f4ba3e]/50 focus-within:bg-zinc-800/80 shadow-lg">
 
 					<input

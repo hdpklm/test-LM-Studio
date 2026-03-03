@@ -1,0 +1,25 @@
+requirements.txt:
+  - Added fastapi, uvicorn, python-multipart to dependencies (L5-L7)
+
+react-web/package.json:
+  - Downgraded vite from ^7.3.1 to ^5.4.11 for Node 20.18.1 compatibility
+  - Downgraded @vitejs/plugin-react from ^5.1.1 to ^4.3.4
+
+react-web/src/components/layout/LeftDrawer.jsx:
+  - Changed positioning from fixed to relative (flex item)
+  - Implemented width transition (w-64 vs w-0) instead of translate-x
+  - Added shrink-0 to prevent flex compression
+  - Added Agents section (Free Chat, SysPro-Gen, LongLoop-Agent) above History
+
+react-web/src/context/ChatContext.jsx:
+  - Added chatMode state (free, syspro, longloop)
+
+react-web/src/components/chat/ChatArea.jsx:
+  - Added text selection listener
+  - Implemented floating "Add to Chat" button (MessageSquarePlus icon)
+  - Added logic to append selected text as quote to input
+  - Fixed syntax error in useEffect hooks
+  - Refactored quotes to display as a dismissible badge above input instead of raw text
+  - Replaced debounced selection listener with mouseup event for instant response on release
+  - Added persistent yellow highlighting for quoted text using absolute overlays
+  - Prevented selection clearing when interacting with the quote button

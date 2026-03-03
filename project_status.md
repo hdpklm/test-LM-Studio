@@ -1,4 +1,4 @@
-# Estado del Proyecto (v1.26)
+# Estado del Proyecto (v1.28)
 
 ## Main Project
 
@@ -12,7 +12,7 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 ### Sección de archivos de código
 
 - **`test-LM-Studio/main.py`**
-	- Descripción: Servidor FastAPI Backend para el chat (v1.26).
+	- Descripción: Servidor FastAPI Backend para el chat (v1.28).
 	- Endpoints:
 		- `POST /api/chat`: Parámetros en body JSON. Devuelve: `JSON` con la respuesta del LLM y tool calls.
 		- `GET /api/history`: Devuelve: `JSON` array con la lista de conversaciones.
@@ -25,6 +25,15 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 		- `read_web_page(url)`: Parámetro: `url` (string). Devuelve: `string`. Extrae el contenido y lo convierte a texto.
 		- `deep_thinking(prompt)`: Parámetro: `prompt` (string). Devuelve: `string`. Realiza pensamientos en profundidad agregando múltiples modelos/llamadas.
 
+- **`test-LM-Studio/react-web/src/context/ChatContext.jsx`**
+	- Descripción: Contexto global React. Gestiona estados principales como `chatMode` (free, syspro, longloop).
+
+- **`test-LM-Studio/react-web/src/components/layout/LeftDrawer.jsx`**
+	- Descripción: Panel lateral izquierdo. Posicionamiento relativo por flexbox (no fixed). Contiene el selector de Agentes y el historial.
+
+- **`test-LM-Studio/react-web/src/components/chat/ChatArea.jsx`**
+	- Descripción: Área principal del chat. Soporta selección de texto del historial, resaltado y conversión de texto a citas para el envío.
+
 ## Futuros Desarrollos / Agentes
 
 ### Sección de directorios
@@ -34,6 +43,7 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 	- **`agente_viajes.mini.md`**: Versión corta y directa para accesibilidad visual (Agente de Viajes).
 	- **`agente_python_arquitecto.md`**: Plan de diseño para el Agente Experto en Python enfocado en funciones puras y responsabilidad única.
 	- **`agente_python_arquitecto.mini.md`**: Versión corta y directa (Agente Arquitecto Python).
+	- **`creador_guiones_youtube.mini.md`**: Versión corta y directa (Agente Creador de Guiones YouTube).
 - **`test-LM-Studio/SysPro/`**
 	- **Propósito**: Esta carpeta almacena los system prompts que tiene que utilizar cada agente.
 - **`test-LM-Studio/gemini_test/`**

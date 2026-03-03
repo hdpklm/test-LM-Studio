@@ -141,3 +141,16 @@
 - **Problema**: El modelo AI respondía al usuario diciendo de forma incorrecta que dominios como `jsonwise.com` "no tenían contenido o no se podían extraer" a pesar de que la herramienta `read_web_page` funcionaba en un 100% y devolvía el código fuente exacto (`"Bienvenido al Backend Dinámico..."`).
 - **Causa**: Limitación cognitiva del LLM local de 1B. Para él, una página con "14 palabras" es anómala (sin menús, ni artículos, ni HTML común), así que en vez de transcribirlo textualmente deduciendo que es un sitio en construcción o una respuesta REST, "alucina" disculpándose y diciendo que la web no tiene utilidad/contenido extraíble.
 - **Solución**: Se añadió una directiva estricta al `system_prompt` que detecta este patrón. Ahora el sistema le dicta: *"Si una herramienta devuelve un texto muy corto, NUNCA digas que no hay contenido. En su lugar, cita el texto exacto devuelto y deduce que la página podría estar en construcción o ser un archivo raw"*. Obligando al LLM a comportarse como un proxy fiel.
+
+### 📝 Registro: [v1.27] - Inicialización Agente Guiones YouTube
+- **Problema**: El usuario requiere un prompt especializado (un agente) para la redacción de guiones de YouTube.
+- **Causa**: Nueva característica solicitada para crear un workflow de agente de guiones.
+- **Solución**: Se creó el archivo inicial `PlanesDeTranajo/creador_guiones_youtube.mini.md` y se añadió su registro. Se incrementó la versión a v1.27.
+
+### 📝 Registro: [v1.28] - Mejoras de UI e Integración frontend por agente externo (Trae)
+- **Problema**: Mejoras en la interfaz de chat (citado de texto, transiciones del cajón izquierdo y selección de agentes) y estabilización de las dependencias base.
+- **Causa**: Uso del editor inteligente `trae` por el usuario para agilizar el diseño.
+- **Solución**: 
+  - **Backend/Config**: Se agregaron `fastapi`, `uvicorn`, `python-multipart` a `requirements.txt`. En `react-web/package.json` se bajó la versión de `vite` a ^5.4.11 y `@vitejs/plugin-react` a ^4.3.4 para asegurar compatibilidad.
+  - **React Context**: Agregado el estado `chatMode` en `ChatContext.jsx`.
+  - **UI/UX Componentes**: En `LeftDrawer.jsx` la posición cambió de `fixed` a `relative` con transiciones de ancho sin ocultar el contenido, y se agregó la sección "Agents". En `ChatArea.jsx` se incluyó un botón flotante reactivo al seleccionar texto que permite agregarlo como una cita ("quote") resaltada en el input antes de mandar el mensaje.

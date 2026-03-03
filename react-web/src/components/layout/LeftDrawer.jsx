@@ -1,15 +1,54 @@
 import React from 'react';
 import { useChat } from '../../context/ChatContext';
-import { MessageSquare, FolderClock, Menu } from 'lucide-react';
+import { MessageSquare, FolderClock, Menu, Zap, Bot, Workflow } from 'lucide-react';
 
 const LeftDrawer = () => {
-	const { leftDrawerOpen, toggleLeftDrawer, historyList, setCurrentChatId, currentChatId } = useChat();
+	const { leftDrawerOpen, toggleLeftDrawer, historyList, setCurrentChatId, currentChatId, chatMode, setChatMode } = useChat();
+
+	const handleModeSelect = (mode) => {
+		setChatMode(mode);
+		setCurrentChatId(null);
+	};
 
 	return (
 		<div
-			className={`fixed top-0 left-0 h-full bg-zinc-950/80 backdrop-blur-md border-r border-zinc-800 transition-transform duration-300 z-40 flex flex-col ${leftDrawerOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'
+			className={`h-full bg-zinc-950/80 backdrop-blur-md border-r border-zinc-800 transition-all duration-300 flex flex-col shrink-0 ${leftDrawerOpen ? 'w-64 translate-x-0' : 'w-0 -translate-x-full opacity-0 overflow-hidden border-r-0'
 				}`}
 		>
+			<div className="p-3 border-b border-zinc-800/50 space-y-1">
+				<div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-2">Agentes</div>
+				
+				<button
+					onClick={() => handleModeSelect('free')}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+						chatMode === 'free' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+					}`}
+				>
+					<Zap className="w-4 h-4 shrink-0" />
+					<span>Free Chat</span>
+				</button>
+
+				<button
+					onClick={() => handleModeSelect('syspro')}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+						chatMode === 'syspro' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+					}`}
+				>
+					<Bot className="w-4 h-4 shrink-0" />
+					<span>SysPro-Gen</span>
+				</button>
+
+				<button
+					onClick={() => handleModeSelect('longloop')}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
+						chatMode === 'longloop' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+					}`}
+				>
+					<Workflow className="w-4 h-4 shrink-0" />
+					<span>LongLoop-Agent</span>
+				</button>
+			</div>
+
 			<div className="p-4 flex items-center justify-between border-b border-zinc-800/50">
 				<div className="flex items-center gap-2 text-zinc-100 font-semibold font-mono">
 					<FolderClock className="w-5 h-5 text-[#f4ba3e]" />
