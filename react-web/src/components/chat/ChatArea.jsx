@@ -281,9 +281,10 @@ const ChatArea = () => {
 					finalContent += node.textContent;
 				} else if (node.nodeType === Node.ELEMENT_NODE) {
 					if (node.tagName === 'SPAN' && node.classList.contains('inline-flex')) {
-						// Es un badge, extraemos de un data array en lugar de su innertext visual q es "sel-x"
+						// Es un badge, extraemos el payload con el ID y las coordenadas start/stop
 						const quoteText = node.getAttribute('data-quote-text') || node.textContent;
-						finalContent += `\n> ${quoteText}\n`;
+						const quotePayload = node.getAttribute('data-quote-payload') || 'selected(unknown)';
+						finalContent += `\n> ${quotePayload} "${quoteText}"\n`;
 					} else if (node.tagName === 'DIV' || node.tagName === 'BR') {
 						finalContent += '\n' + node.textContent;
 					} else {

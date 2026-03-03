@@ -197,3 +197,8 @@
 - **Solución**: 
   - **Estabilización de Dom**: Se encapsuló `MessageBubble.jsx` dentro de un `React.memo()`. Esto detuvo completamente los re-renders innecesarios del historial de chat cada vez que la barra inferior interactiva cambia, persistiendo tanto el `<textarea>` nativo como los objetos `DOM Range` estáticos en memoria.
   - **Fallback de Highlights**: Para lidiar matemáticamente con los bloques de código, a los extractos provenientes de Textareas (`textarea_fake_range`) se les asignó un Renderizado de Respaldo (`isFallback: true`) en el motor de resaltado, dibujando un borde sólido amarillo y un sombreado leve en todo el componente del mensaje que los contiene en lugar de intentar trazar el texto con precisión letal.
+
+### 📝 Registro: [v1.37] - Traspaso de Data Espacial (Start/Stop) hacia el LLM
+- **Problema**: A pesar de que la UI de react procesaba internamente las variables posicionales (ID del mensaje en array, Start del String y Longitud) introducidas en la v1.35, el analizador subyacente de la caja de texto al momento de presionar el botón "Enviar" las descartaba, omitiendo esta información táctica necesaria para que el modelo IA pudiese rastrear qué punto exacto se seleccionó sin ambigüedades de strings repetidos.
+- **Causa**: Al convertir los nodos DOM a texto llano en `handleSend`, sólo se pasaba la propiedad pura `quoteText`.
+- **Solución**: Se modificó `handleSend` en `ChatArea.jsx` y ahora extrae explícitamente el atributo compuesto precalculado `data-quote-payload`. Las citas formateadas enviadas en el prompt al backend cambian a: `> selected(ID, start, stop) "Texto Citado"`, sirviendo tanto como un fallback legible para humanos como una vectorización útil de instrucciones al sistema de IA.
