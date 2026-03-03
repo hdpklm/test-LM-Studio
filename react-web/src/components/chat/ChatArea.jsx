@@ -28,6 +28,7 @@ const ChatArea = () => {
 			let rect = null;
 			let range = null;
 			let msgIndex = null;
+			let occurrenceIndex = 0;
 
 			// Handle input/textarea selection (like LiveEditor inside React Live)
 			const activeEl = document.activeElement;
@@ -46,6 +47,15 @@ const ChatArea = () => {
 
 					const containerNode = activeEl.closest('[data-message-index]');
 					if (containerNode) msgIndex = parseInt(containerNode.getAttribute('data-message-index'));
+
+					if (text) {
+						const precedingText = activeEl.value.substring(0, activeEl.selectionStart);
+						let pos = 0;
+						while ((pos = precedingText.indexOf(text, pos)) !== -1) {
+							occurrenceIndex++;
+							pos += 1;
+						}
+					}
 				}
 			} else {
 				// Regular document selection
@@ -58,7 +68,20 @@ const ChatArea = () => {
 						if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
 							rect = range.getBoundingClientRect();
 							const containerNode = range.commonAncestorContainer.nodeType === 3 ? range.commonAncestorContainer.parentNode.closest('[data-message-index]') : range.commonAncestorContainer.closest('[data-message-index]');
-							if (containerNode) msgIndex = parseInt(containerNode.getAttribute('data-message-index'));
+							if (containerNode) {
+								msgIndex = parseInt(containerNode.getAttribute('data-message-index'));
+								if (text) {
+									const preCaretRange = range.cloneRange();
+									preCaretRange.selectNodeContents(containerNode);
+									preCaretRange.setEnd(range.startContainer, range.startOffset);
+									const precedingText = preCaretRange.toString();
+									let pos = 0;
+									while ((pos = precedingText.indexOf(text, pos)) !== -1) {
+										occurrenceIndex++;
+										pos += 1;
+									}
+								}
+							}
 						} else {
 							text = ''; // No pertenece al chat
 						}
@@ -79,7 +102,8 @@ const ChatArea = () => {
 					top: rect.bottom + 10,
 					left: rect.left + (rect.width / 2) - 16,
 					range: range,
-					msgIndex: msgIndex
+					msgIndex: msgIndex,
+					occurrenceIndex: occurrenceIndex
 				});
 			} else {
 				setSelectionData(null);
@@ -132,7 +156,19 @@ const ChatArea = () => {
 			let stop = -1;
 			if (selectionData.msgIndex !== null && messages[selectionData.msgIndex]) {
 				const rawText = messages[selectionData.msgIndex].content;
-				start = rawText.indexOf(selectionData.text);
+				let pos = 0;
+				let currOcc = 0;
+				while ((pos = rawText.indexOf(selectionData.text, pos)) !== -1) {
+					if (currOcc === selectionData.occurrenceIndex) {
+						start = pos;
+						break;
+					}
+					currOcc++;
+					pos += 1;
+				}
+				// Default a indexOf simple si no matcheó
+				if (start === -1) start = rawText.indexOf(selectionData.text);
+
 				if (start !== -1) {
 					stop = start + selectionData.text.length;
 				}
@@ -147,7 +183,7 @@ const ChatArea = () => {
 			};
 			setActiveQuotes(prev => [...prev, newQuote]);
 
-			const payload = `selected(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${start}, ${stop})`;
+			const payload = `__cite__(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${selectionData.occurrenceIndex || 0}, ${start}, ${stop})`;
 
 			// Crear el nodo HTML del badge (pequeño, 1 línea, sin mostrar el texto adentro)
 			const badgeHtml = `<span contenteditable="false" data-quote-id="${quoteId}" data-quote-payload="${payload}" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" onclick="window.dispatchEvent(new CustomEvent('blink-quote', {detail: '${quoteId}'}))" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-pointer align-baseline select-none">
@@ -189,13 +225,14 @@ const ChatArea = () => {
 	useEffect(() => {
 		const newHist = [];
 		messages.forEach((msg, idx) => {
-			const regex = />\s*selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"([^"]+)"/g;
+			const regex = />\s*__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"([^"]+)"/g;
 			let match;
 			while ((match = regex.exec(msg.content)) !== null) {
 				const citedMsgId = parseInt(match[1]);
-				const textToFind = match[4].replace(/&quot;/g, '"');
+				const occurrenceIndex = parseInt(match[2]);
+				const textToFind = match[5].replace(/&quot;/g, '"');
 				if (!isNaN(citedMsgId)) {
-					newHist.push({ citedMsgId, text: textToFind, id: `hist-${idx}-${match.index}`, isBlinking: false });
+					newHist.push({ citedMsgId, occurrenceIndex, text: textToFind, id: `hist-${idx}-${match.index}`, isBlinking: false });
 				}
 			}
 		});
@@ -206,7 +243,7 @@ const ChatArea = () => {
 			const resolvedHist = newHist.map(q => {
 				const msgEl = chatContainerRef.current.querySelector(`[data-message-index="${q.citedMsgId}"]`);
 				if (msgEl) {
-					const range = createRangeForTextInNode(msgEl, q.text);
+					const range = createRangeForTextInNode(msgEl, q.text, q.occurrenceIndex);
 					return { ...q, range: range || 'textarea_fake_range', msgIndex: q.citedMsgId };
 				}
 				return q;
@@ -284,10 +321,10 @@ const ChatArea = () => {
 			}, 800);
 		};
 		const blinkHistHandler = (e) => {
-			const { msgId, text } = e.detail;
-			setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text) ? { ...q, isBlinking: true } : q));
+			const { msgId, text, occurrenceIndex } = e.detail;
+			setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text && q.occurrenceIndex === occurrenceIndex) ? { ...q, isBlinking: true } : q));
 			setTimeout(() => {
-				setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text) ? { ...q, isBlinking: false } : q));
+				setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text && q.occurrenceIndex === occurrenceIndex) ? { ...q, isBlinking: false } : q));
 			}, 800);
 		};
 		window.addEventListener('blink-quote', blinkHandler);
@@ -553,7 +590,7 @@ const ChatArea = () => {
 export default ChatArea;
 
 // DOM Helper to safely hunt strings and transform them into coordinate rectangles
-function createRangeForTextInNode(node, text) {
+function createRangeForTextInNode(node, text, occurrenceIndex = 0) {
 	let acc = "";
 	const textNodes = [];
 	const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, null, false);
@@ -563,8 +600,23 @@ function createRangeForTextInNode(node, text) {
 		acc += n.nodeValue;
 	}
 
-	const startIndex = acc.indexOf(text);
-	if (startIndex === -1) return null;
+	let startIndex = -1;
+	let currOcc = 0;
+	let pos = 0;
+	while ((pos = acc.indexOf(text, pos)) !== -1) {
+		if (currOcc === occurrenceIndex) {
+			startIndex = pos;
+			break;
+		}
+		currOcc++;
+		pos += 1;
+	}
+
+	if (startIndex === -1) {
+		startIndex = acc.indexOf(text);
+		if (startIndex === -1) return null;
+	}
+
 	const endIndex = startIndex + text.length;
 
 	let startNode, startOffset, endNode, endOffset;

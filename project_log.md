@@ -209,3 +209,10 @@
 - **Solución**: 
   - **Parsing en Markdown**: Se introdujo una regla regex en el parser personalizado `blockquote` de `MessageBubble.jsx` que intercepta comandos como `> selected(X, Y, Z) "Texto"` y los recompila visualmente a pequeños botones flotantes clickeables que difunden la señal CSS hacia el historial usando `blink-quote-history`.
   - **TreeWalker DOM Absoluto**: Se introdujo una rutina asíncrona en `ChatArea.jsx` que, al actualizarse el historial de mensajes, escanea recurrentemente (usando `document.createTreeWalker`) todos los nodos de la página buscando coincidencias físicas basándose en la metadada. Si las halla, extrapola coordenadas de Rango Nativas (`createRange()`) y levanta las mismas láminas amarillas de fondo tanto para citas reactivas como para citas históricas archivadas.
+
+### 📝 Registro: [v1.39] - Corrección de Colisión Lingüística y Tracking Recursivo (`occurrenceIndex`)
+- **Problema**: El analizador estático fallaba si el texto del usuario incluía naturalmente la palabra "selected(..." o si seleccionaba una palabra muy genérica como "a" que ya existiera en el mismo mensaje. Al recargar el historial, el parser encendía el fondo amarillo de la primera palabra "a" que viera en lugar de la que el usuario marcó realmente.
+- **Causa**: Limitación en el parser visual del DOM, que buscaba la primera coincidencia usando `indexOf()`, y uso de un keyword ("selected") muy susceptible a falsos positivos en conversaciones técnicas de programación.
+- **Solución**: 
+  - **Keyword Fuerte**: Sustituido el marcador base en los prompts por `__cite__(msgId, occurrence, start, stop)` para virtualmente imposibilitar que se accione un botón flotante por accidente al hablar de código.
+  - **Variable Ocurrencia**: Se inyectó en el capturador nativo de `handleMouseUp` un mini-algoritmo que cuenta matemáticamente (vía substrings) cuántas veces aparece ese mismo texto en el párrafo antes de hacer la selección del ratón. Este valor precalculado (`occurrenceIndex`) viaja incrustado en el meta-tag y permite que, al regresar desde el historial o servidor, el `TreeWalker` ilumine la ocurrencia N.º precisa.

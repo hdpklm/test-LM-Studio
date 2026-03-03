@@ -39,19 +39,20 @@ const MessageBubble = ({ message, msgIndex }) => {
 									};
 									const rawText = getTextLines(children).trim();
 
-									// Fetch the pattern selected(id, start, stop) "text"
-									const match = rawText.match(/^selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"(.*)"$/s) ||
-										rawText.match(/^selected\(\s*(\d+|unknown)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/s);
+									// Fetch the pattern __cite__(id, occurrenceIndex, start, stop) "text"
+									const match = rawText.match(/^__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"(.*)"$/s) ||
+										rawText.match(/^__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/s);
 
 									if (match) {
 										const msgId = match[1];
-										const quoteText = match[4] || "Cita extraída";
+										const occurrenceIndex = parseInt(match[2]);
+										const quoteText = match[5] || "Cita extraída";
 										return (
 											<span
 												className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 py-0.5 rounded text-xs font-mono mb-1 mr-1 align-middle cursor-pointer"
 												title={quoteText}
 												onClick={() => {
-													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, text: quoteText } }));
+													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, text: quoteText, occurrenceIndex } }));
 												}}
 											>
 												<span className="truncate max-w-[150px] inline-block font-sans text-xs italic">
