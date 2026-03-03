@@ -241,7 +241,31 @@
 - **Causa**: Los dobles guiones bajos (`__`) son operadores reservados del lenguaje universal Markdown para aplicar énfasis visuales (bold).
 - **Solución**: Reemplazada categóricamente la palabra de invocación nativa por `[cite]`, resultando en la macro `´´´[cite](msgId, occurrence, start, stop)>texto´´´` convirtiéndola en una secuencia gramatical invisible e inmune a las transformaciones core del parseador DOM conversacional.
 
-### 📝 Registro: [v1.44] - Trim Espacial Dinámico
+### 📝 Registro: [v1.44] - Guardado de Historial con Etiquetas IA (Append-Only)
+- **Problema**: El historial de chat no se guardaba por sesión ni se etiquetaba, y guardar reescribiendo el archivo completo daña los ciclos de escritura del SSD del usuario.
+- **Causa**: Faltaba una funcionalidad persistente y segura para almacenar conversaciones individuales.
+- **Solución**: Se creó `history_manager.py` con una cola asíncrona (`asyncio.Queue`) que procesa cada mensaje en segundo plano. Mediante múltiples pasadas de LLM (3 extracciones + 1 consenso), genera etiquetas relevantes de búsqueda. Por bioseguridad del hardware (SSD), el JSON se manipula a nivel de bytes (`open('r+b')`), sobreescribiendo el último `}` para añadir los nuevos nodos iterativamente, operando como un append estricto sin reescrituras masivas. Se vinculó esto a `main.py` pasándole cada interacción nativa.
+
+### 📝 Registro: [v1.45] - Trim Espacial Dinámico
 - **Problema**: El capturador nativo de selecciones del navegador web capturaba espacios en blanco adicionales que el usuario arrastraba de más sin querer (ej. `"   hola  "`), ocasionando que el badge ocupara innecesario ancho de pantalla e iluminara huecos en el diseño.
 - **Causa**: Limitación técnica del cursor general del sistema.
 - **Solución**: Un algorítmo matemático auto-trim `while` en cascada inyectado sobre `ChatArea.jsx`. Cuando el usuario levanta el click (mouseup) analiza si en el `rawText` de la posición original las letras correspondientes a `start` y `stop` equivalen a vacíos (`\\s`). De ser así, aprieta los punteros hasta llegar al texto puro, acortando la selección final que emite hacia el badge.
+
+### 📝 Registro: [v1.46] - Fix Payload del Historial Frontend vs Backend
+- **Problema**: El frontend devolvía una pantalla vacía o fallaba silenciosamente al intentar recuperar el historial de chat anterior después de la implementación de `history_manager.py`.
+- **Causa**: El archivo JSON `{history_id}.json` guarda los datos en forma de objeto dictado con strings indexadas (`"0": {"user":...}`) según los requerimientos solicitados para no corromper la lectura secuencial, pero `React` esperaba un array literal `messages` con un formato plano `[{role: "user", content: "..."}]`.
+- **Solución**: Se actualizó el endpoint `get_history_detail` de `main.py` para no servir el JSON en crudo, sino iterar el diccionario backend, extraer las llaves internas (roles, tags) e inyectarlas en un Array List estandarizado (`{"messages": [...] }`) haciéndolo 100% compatible con el parser de `ChatArea.jsx`.
+
+### 📝 Registro: [v1.47] - Fix Duplicidad .json al Añadir Historial
+- **Problema**: Cuando el usuario enviaba un nuevo mensaje en un chat antiguo cargado, el backend creaba un nuevo archivo llamado `{id}.json.json` en lugar de continuar escribiendo en el original.
+- **Causa**: Al cargar el chat antiguo, la variable `currentChatId` que viajaba al backend incluía la extensión, y la clase `HistoryManager` volvía a concatenar ciegamente `+ ".json"` al construir el path de lectura/escritura (`file_path`).
+- **Solución**: Se insertó una cláusula condicional de saneamiento (`history_id.endswith('.json')`) dentro de `_process_and_save` en `history_manager.py` para rebanar (`[:-5]`) cualquier sufijo residual antes de abrir el puntero `r+b`.
+### 📝 Registro: [v1.48] - Ocultar System Prompts al Cargar Historial
+- **Problema**: Cuando el usuario abría un chat del historial, la interfaz de React mostraba el inmenso bloque del "System Prompt" como un mensaje normal, lo que ensuciaba la lectura de la conversación de cara al usuario.
+- **Causa**: El endpoint `/api/history/{id}` leía y volcaba todos los mensajes iterativamente, careciendo de un filtro para descartar intencionalmente el rol `system` al preparar el payload del frontend.
+- **Solución**: Se añadió una condicional `if role and role != "system":` en `main.py` antes de inyectar el nodo en la lista `messages_list`, filtrando satisfactoriamente las instrucciones de sistema.
+
+### 📝 Registro: [v1.49] - System Prompt UI Colapsable
+- **Problema**: Ocultar completamente el System Prompt desde el backend impedía al usuario comprobar bajo qué reglas o personalidad se originó ese chat en concreto, quitando contexto importante si el chat era antiguo.
+- **Causa**: Limitación de la solución anterior que purgaba el mensaje.
+- **Solución**: Se reactivó la emisión del rol `system` en `main.py`. A nivel Frontend, se expandió `MessageBubble.jsx` agregando una lógica condicional `isSystem`. Si pertenece al sistema, se envuelve en un div con `overflow-hidden` forzado a un alto máximo (`max-h-16`) junto a un overlay visual (`bg-gradient-to-t pointer-events-none`). Un botón inferior interactúa con el estado `isExpanded` para desplegar temporalmente la lectura del bloque completo cuando el usuario lo solicite explícitamente.

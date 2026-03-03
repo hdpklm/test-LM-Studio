@@ -14,7 +14,7 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - **`test-LM-Studio/main.py`**
 	- Descripción: Servidor FastAPI Backend para el chat (v1.28).
 	- Endpoints:
-		- `POST /api/chat`: Parámetros en body JSON. Devuelve: `JSON` con la respuesta del LLM y tool calls.
+		- `POST /api/chat`: Parámetros en body JSON. Devuelve: `JSON` con la respuesta del LLM, tool calls, y `history_id`.
 		- `GET /api/history`: Devuelve: `JSON` array con la lista de conversaciones.
 		- `GET /api/history/{id}`: Devuelve: `JSON` de una conversación específica.
 		- `POST /api/upload`: Parámetros `FormData` con archivo. Devuelve: `JSON` estado.
@@ -24,6 +24,13 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 		- `search_google_and_print(query)`: Parámetro: `query` (string). Devuelve: `string` (JSON). Hace la búsqueda en google.
 		- `read_web_page(url)`: Parámetro: `url` (string). Devuelve: `string`. Extrae el contenido y lo convierte a texto.
 		- `deep_thinking(prompt)`: Parámetro: `prompt` (string). Devuelve: `string`. Realiza pensamientos en profundidad agregando múltiples modelos/llamadas.
+
+- **`test-LM-Studio/history_manager.py`**
+	- Descripción: Gestor asíncrono de guardado de historiales de chat en formato JSON (Append-Only) con etiquetado por LLM.
+	- Funciones Principales:
+		- `enqueue_message(history_id, role, content)`: Encola el mensaje para procesamiento asíncrono en segundo plano.
+		- `_generate_tags_for_message(content)`: Genera etiquetas de búsqueda mediante 3 pasadas de LLM simultáneas y 1 consolidación.
+		- `_secure_append_to_history(file_path, role, content, tags)`: Añade bloques de mensaje modificando sólo el último byte del JSON, sin sobreescribir repetitivamente el archivo.
 
 - **`test-LM-Studio/react-web/src/context/ChatContext.jsx`**
 	- Descripción: Contexto global React. Gestiona estados principales como `chatMode` (free, syspro, longloop).
