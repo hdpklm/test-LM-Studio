@@ -35,7 +35,7 @@ const ChatArea = () => {
 				const range = selection.getRangeAt(0);
 				if (chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
 					const rect = range.getBoundingClientRect();
-					
+
 					setSelectionData({
 						text: selection.toString(),
 						top: rect.bottom + 10,
@@ -57,7 +57,7 @@ const ChatArea = () => {
 		// User reported "se deselecta el texto". This usually happens if focus is lost or a re-render happens.
 		// Let's just remove the selectionchange listener that clears data.
 		// Instead, we can clear when starting a new selection or clicking elsewhere.
-		
+
 		const handleMouseDown = (e) => {
 			// If clicking outside chat area and button, clear selection data
 			// (Simple heuristic)
@@ -67,9 +67,9 @@ const ChatArea = () => {
 		};
 
 		document.addEventListener('mouseup', handleMouseUp);
-		document.addEventListener('keyup', handleMouseUp); 
+		document.addEventListener('keyup', handleMouseUp);
 		document.addEventListener('mousedown', handleMouseDown);
-		
+
 		return () => {
 			document.removeEventListener('mouseup', handleMouseUp);
 			document.removeEventListener('keyup', handleMouseUp);
@@ -80,7 +80,7 @@ const ChatArea = () => {
 	const handleAddToInput = () => {
 		if (selectionData?.text && selectionData.range && chatContainerRef.current) {
 			setQuotedContent(selectionData.text);
-			
+
 			// Calculate relative rects for highlighting
 			const range = selectionData.range;
 			const rects = Array.from(range.getClientRects());
@@ -94,7 +94,7 @@ const ChatArea = () => {
 				width: r.width,
 				height: r.height
 			}));
-			
+
 			setHighlightRects(relativeRects);
 			setSelectionData(null);
 			window.getSelection().removeAllRanges();
@@ -217,7 +217,7 @@ const ChatArea = () => {
 			</div>
 
 			{/* Messages Area */}
-			<div 
+			<div
 				ref={chatContainerRef}
 				className="flex-1 overflow-y-auto p-4 md:px-20 lg:px-40 xl:px-60 scrollbar-thin relative"
 			>
@@ -265,66 +265,71 @@ const ChatArea = () => {
 				<div ref={messagesEndRef} />
 			</div>
 
-			{/* Input Area */}
 			<div className="p-4 md:px-20 lg:px-40 xl:px-60 bg-gradient-to-t from-zinc-950 via-zinc-900 to-transparent">
-				{quotedContent && (
-					<div className="mb-2 bg-zinc-800/80 border border-zinc-700/50 rounded-lg p-2 flex items-start justify-between backdrop-blur-sm animate-in slide-in-from-bottom-2 fade-in">
-						<div className="text-zinc-400 text-sm italic truncate border-l-2 border-[#f4ba3e] pl-2 max-w-[90%]">
-							"{quotedContent}"
+				<form onSubmit={handleSend} className="relative flex flex-col gap-2 bg-zinc-800 border-[1px] border-zinc-700/50 rounded-2xl p-2 transition-shadow focus-within:ring-2 focus-within:ring-[#f4ba3e]/50 focus-within:bg-zinc-800/80 shadow-lg">
+
+					{/* Badge de Cita (Quote) Superior dentro del Input */}
+					{quotedContent && (
+						<div className="mx-2 mt-2 bg-zinc-700/50 rounded-lg p-2 flex items-center justify-between animate-in slide-in-from-bottom-2 fade-in">
+							<div className="text-zinc-300 text-sm italic truncate border-l-4 border-[#f4ba3e] pl-3 flex-1">
+								"{quotedContent}"
+							</div>
+							<button
+								onClick={() => {
+									setQuotedContent(null);
+									setHighlightRects([]);
+								}}
+								className="text-zinc-400 hover:text-red-400 p-1 rounded-md hover:bg-zinc-600/50 transition-colors ml-2 shrink-0"
+								type="button"
+								title="Eliminar cita"
+							>
+								<X className="w-4 h-4" />
+							</button>
 						</div>
-						<button 
-							onClick={() => {
-								setQuotedContent(null);
-								setHighlightRects([]);
-							}}
-							className="text-zinc-500 hover:text-red-400 p-1 rounded-md hover:bg-zinc-700/50 transition-colors"
+					)}
+
+					<div className="flex items-end gap-2 w-full">
+						<input
+							type="file"
+							ref={fileInputRef}
+							className="hidden"
+							onChange={handleFileUpload}
+							accept="image/*,audio/*,video/*,.pdf,.txt,.js,.py,.md"
+						/>
+						<button
+							type="button"
+							onClick={() => fileInputRef.current?.click()}
+							disabled={uploading}
+							className="p-3 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 rounded-xl transition-colors disabled:opacity-50 shrink-0"
 						>
-							<X className="w-4 h-4" />
+							<Paperclip className="w-5 h-5" />
+						</button>
+
+						<textarea
+							value={input}
+							onChange={(e) => setInput(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' && !e.shiftKey) {
+									e.preventDefault();
+									handleSend();
+								}
+							}}
+							placeholder="Pregunta a LM-Studio..."
+							className="w-full max-h-48 min-h-[44px] bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-3 scrollbar-thin"
+							rows="1"
+						/>
+
+						<button
+							type="submit"
+							disabled={!input.trim() || isLoading}
+							className={`p-3 rounded-xl transition-all shrink-0 ${!input.trim() || isLoading
+								? 'bg-zinc-700 text-zinc-500'
+								: 'bg-[#f4ba3e] text-zinc-950 hover:bg-[#dca331] shadow-[0_0_15px_rgba(244,186,62,0.3)]'
+								}`}
+						>
+							<Send className="w-5 h-5" />
 						</button>
 					</div>
-				)}
-				<form onSubmit={handleSend} className="relative flex items-end gap-2 bg-zinc-800 border-zinc-700/50 rounded-2xl p-2 transition-shadow focus-within:ring-2 focus-within:ring-[#f4ba3e]/50 focus-within:bg-zinc-800/80 shadow-lg">
-
-					<input
-						type="file"
-						ref={fileInputRef}
-						className="hidden"
-						onChange={handleFileUpload}
-						accept="image/*,audio/*,video/*,.pdf,.txt,.js,.py,.md"
-					/>
-					<button
-						type="button"
-						onClick={() => fileInputRef.current?.click()}
-						disabled={uploading}
-						className="p-3 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 rounded-xl transition-colors disabled:opacity-50"
-					>
-						<Paperclip className="w-5 h-5" />
-					</button>
-
-					<textarea
-						value={input}
-						onChange={(e) => setInput(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === 'Enter' && !e.shiftKey) {
-								e.preventDefault();
-								handleSend();
-							}
-						}}
-						placeholder="Pregunta a LM-Studio..."
-						className="w-full max-h-48 min-h-[44px] bg-transparent text-zinc-100 placeholder-zinc-500 resize-none outline-none py-3 scrollbar-thin"
-						rows="1"
-					/>
-
-					<button
-						type="submit"
-						disabled={!input.trim() || isLoading}
-						className={`p-3 rounded-xl transition-all ${!input.trim() || isLoading
-							? 'bg-zinc-700 text-zinc-500'
-							: 'bg-[#f4ba3e] text-zinc-950 hover:bg-[#dca331] shadow-[0_0_15px_rgba(244,186,62,0.3)]'
-							}`}
-					>
-						<Send className="w-5 h-5" />
-					</button>
 				</form>
 				<div className="text-center text-xs text-zinc-500 mt-2">
 					LM-Studio Local API · AI can make mistakes

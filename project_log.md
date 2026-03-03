@@ -154,3 +154,9 @@
   - **Backend/Config**: Se agregaron `fastapi`, `uvicorn`, `python-multipart` a `requirements.txt`. En `react-web/package.json` se bajó la versión de `vite` a ^5.4.11 y `@vitejs/plugin-react` a ^4.3.4 para asegurar compatibilidad.
   - **React Context**: Agregado el estado `chatMode` en `ChatContext.jsx`.
   - **UI/UX Componentes**: En `LeftDrawer.jsx` la posición cambió de `fixed` a `relative` con transiciones de ancho sin ocultar el contenido, y se agregó la sección "Agents". En `ChatArea.jsx` se incluyó un botón flotante reactivo al seleccionar texto que permite agregarlo como una cita ("quote") resaltada en el input antes de mandar el mensaje.
+
+### 📝 Registro: [v1.29] - Fix UI de Badge de Selección/Cita en ChatArea
+- **Problema**: El selector de texto no renderizaba el badge correctamente y desalineaba el input del chat. El highlight amarillo desaparecía.
+- **Causa**: El rediseño estructural de flexbox y la ubicación condicional del badge de "Quote" interrumpían la fluidez de flex-row del text-area de envío, y su posicionamiento absoluto estaba perdiendo clases relativas.
+- **Solución**: Se modificó el form contenedor en `ChatArea.jsx` a `flex-col`, moviendo el badge de cita al interior superior del text-area con un estilo de highlight integrado. Se aplicaron clases `shrink-0` a los iconos para que no colapsasen al inyectar texto.
+
