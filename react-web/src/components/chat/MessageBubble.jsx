@@ -39,20 +39,28 @@ const MessageBubble = ({ message, msgIndex }) => {
 									};
 									const rawText = getTextLines(children).trim();
 
-									// Fetch the pattern __cite__(id, occurrenceIndex, start, stop) "text"
-									const match = rawText.match(/^__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"(.*)"$/s) ||
-										rawText.match(/^__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)/s);
+									// Fetch the multi-format selected patterns
+									const match = rawText.match(/^(?:__cite__|selected|comment|cite)\(\s*([^)]+)\s*\)\s*(?:"([^"]+)")?/s);
 
 									if (match) {
-										const msgId = match[1];
-										const occurrenceIndex = parseInt(match[2]);
-										const quoteText = match[5] || "Cita extraída";
+										const parts = match[1].split(',').map(s => s.trim());
+										const msgId = parts[0];
+										let start = 0, stop = 0;
+										if (parts.length === 4) {
+											start = parseInt(parts[2]);
+											stop = parseInt(parts[3]);
+										} else if (parts.length === 3) {
+											start = parseInt(parts[1]);
+											stop = parseInt(parts[2]);
+										}
+
+										const quoteText = match[2] || "Cita extraída";
 										return (
 											<span
 												className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 py-0.5 rounded text-xs font-mono mb-1 mr-1 align-middle cursor-pointer"
 												title={quoteText}
 												onClick={() => {
-													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, text: quoteText, occurrenceIndex } }));
+													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, start, stop } }));
 												}}
 											>
 												<span className="truncate max-w-[150px] inline-block font-sans text-xs italic">

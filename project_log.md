@@ -216,3 +216,15 @@
 - **Solución**: 
   - **Keyword Fuerte**: Sustituido el marcador base en los prompts por `__cite__(msgId, occurrence, start, stop)` para virtualmente imposibilitar que se accione un botón flotante por accidente al hablar de código.
   - **Variable Ocurrencia**: Se inyectó en el capturador nativo de `handleMouseUp` un mini-algoritmo que cuenta matemáticamente (vía substrings) cuántas veces aparece ese mismo texto en el párrafo antes de hacer la selección del ratón. Este valor precalculado (`occurrenceIndex`) viaja incrustado en el meta-tag y permite que, al regresar desde el historial o servidor, el `TreeWalker` ilumine la ocurrencia N.º precisa.
+
+### 📝 Registro: [v1.40] - Compatibilidad Universal de Keywords y Destellos por Coordenadas
+- **Problema**: Mensajes del historial generados en versiones anteriores (v1.38 o betas) que utilizaban palabras clave como `selected(id, s, e)` o formatos sugeridos ignoraban la nueva regla estricta de `__cite__`. En consecuencia, el historial no mostraba ni el subrayado ni parpadeaba al hacerles clic. Además, el parpadeo del historial se basaba en el texto exacto, lo que fallaba a causa de diferencias por espacios en blanco manejados por el DOM.
+- **Causa**: Las expresiones regulares estaban fuertemente tipadas en React y dependientes del string literal.
+- **Solución**: 
+  - **Regex Multi-Sintaxis**: Se actualizó el Regex en `ChatArea.jsx` y `MessageBubble.jsx` a `(?:__cite__|selected|comment)` para leer simultáneamente formatos antiguos de 3 parámetros y el nuevo estándar de 4 parámetros de forma nativa e iterativa.
+  - **Parpadeo Espacial Geométrico**: Ahora el interceptador de clics del usuario en eventos pasados despacha las coordenadas exactas `start` y `stop` para encontrar al clon iluminado, abandonando el viejo método de machear strings y evadiendo los clásicos problemas de parseos invisibles de HTML.
+
+### 📝 Registro: [v1.41] - Permisividad Dinámica y Migración a `comment()`
+- **Problema**: El componente de `ReactMarkdown` renderizaba incorrectamente citas alteradas manualmente en el código fuente (ej. usar estáticamente `cite(...)` como keyword) mostrando comillas rotas llanas (`"cite(...) "div""`) en lugar del Badge interactivo esperado.
+- **Causa**: Los hooks de Regex no capturaban adaptaciones del cliente (como `cite`), derivando al fallback de diseño por defecto.
+- **Solución**: Se amplió la matriz de validación de sintaxis para reconocer `cite` y `comment` nativamente en todo el DOM de React. Además, se configuró el sistema para que transcriba los metadatos internos por defecto al formato demandado explícitamente `comment(msgId, occurrence, start, stop)`, evadiendo definitivamente las debilidades previas y asimilando los cambios locales del usuario.

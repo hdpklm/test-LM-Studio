@@ -183,7 +183,7 @@ const ChatArea = () => {
 			};
 			setActiveQuotes(prev => [...prev, newQuote]);
 
-			const payload = `__cite__(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${selectionData.occurrenceIndex || 0}, ${start}, ${stop})`;
+			const payload = `comment(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${selectionData.occurrenceIndex || 0}, ${start}, ${stop})`;
 
 			// Crear el nodo HTML del badge (pequeño, 1 línea, sin mostrar el texto adentro)
 			const badgeHtml = `<span contenteditable="false" data-quote-id="${quoteId}" data-quote-payload="${payload}" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" onclick="window.dispatchEvent(new CustomEvent('blink-quote', {detail: '${quoteId}'}))" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-pointer align-baseline select-none">
@@ -225,14 +225,24 @@ const ChatArea = () => {
 	useEffect(() => {
 		const newHist = [];
 		messages.forEach((msg, idx) => {
-			const regex = />\s*__cite__\(\s*(\d+|unknown)\s*,\s*(\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)\s*"([^"]+)"/g;
+			const regex = />\s*(?:__cite__|selected|comment|cite)\(\s*([^)]+)\s*\)\s*(?:"([^"]+)")?/g;
 			let match;
 			while ((match = regex.exec(msg.content)) !== null) {
-				const citedMsgId = parseInt(match[1]);
-				const occurrenceIndex = parseInt(match[2]);
-				const textToFind = match[5].replace(/&quot;/g, '"');
+				const parts = match[1].split(',').map(s => s.trim());
+				const citedMsgId = parseInt(parts[0]);
+				let occurrenceIndex = 0;
+				let start = 0, stop = 0;
+				if (parts.length === 4) {
+					occurrenceIndex = parseInt(parts[1]);
+					start = parseInt(parts[2]);
+					stop = parseInt(parts[3]);
+				} else if (parts.length === 3) {
+					start = parseInt(parts[1]);
+					stop = parseInt(parts[2]);
+				}
+				const textToFind = match[2] ? match[2].replace(/&quot;/g, '"') : "Cita extraída";
 				if (!isNaN(citedMsgId)) {
-					newHist.push({ citedMsgId, occurrenceIndex, text: textToFind, id: `hist-${idx}-${match.index}`, isBlinking: false });
+					newHist.push({ citedMsgId, occurrenceIndex, start, stop, text: textToFind, id: `hist-${idx}-${match.index}`, isBlinking: false });
 				}
 			}
 		});
@@ -321,10 +331,10 @@ const ChatArea = () => {
 			}, 800);
 		};
 		const blinkHistHandler = (e) => {
-			const { msgId, text, occurrenceIndex } = e.detail;
-			setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text && q.occurrenceIndex === occurrenceIndex) ? { ...q, isBlinking: true } : q));
+			const { msgId, start, stop } = e.detail;
+			setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.start === start && q.stop === stop) ? { ...q, isBlinking: true } : q));
 			setTimeout(() => {
-				setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.text === text && q.occurrenceIndex === occurrenceIndex) ? { ...q, isBlinking: false } : q));
+				setHistoricalQuotes(prev => prev.map(q => (q.citedMsgId == msgId && q.start === start && q.stop === stop) ? { ...q, isBlinking: false } : q));
 			}, 800);
 		};
 		window.addEventListener('blink-quote', blinkHandler);
