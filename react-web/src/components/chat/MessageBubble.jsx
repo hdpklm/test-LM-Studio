@@ -6,6 +6,50 @@ import { User, Bot } from 'lucide-react';
 // Custom components passed to ReactLive scope
 const scope = { React };
 
+const renderTextWithBadges = (children) => {
+	return React.Children.map(children, child => {
+		if (typeof child === 'string') {
+			const parts = child.split(/(´´´\[cite\]\([^)]+\)>.*?´´´)/);
+			return parts.map((part, i) => {
+				const match = part.match(/^´´´\[cite\]\(\s*([^)]+)\s*\)>(.*?)´´´$/);
+				if (match) {
+					const params = match[1].split(',').map(s => s.trim());
+					const msgId = params[0];
+					let start = 0, stop = 0;
+					if (params.length === 4) {
+						start = parseInt(params[2]);
+						stop = parseInt(params[3]);
+					} else if (params.length === 3) {
+						start = parseInt(params[1]);
+						stop = parseInt(params[2]);
+					}
+
+					const quoteText = match[2];
+					return (
+						<span
+							key={i}
+							className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 py-0.5 rounded text-xs font-mono mb-1 mx-1 align-baseline cursor-pointer"
+							title={quoteText}
+							onClick={() => {
+								window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, start, stop } }));
+							}}
+						>
+							<span className="truncate max-w-[150px] inline-block font-sans text-xs italic">
+								"{quoteText}"
+							</span>
+						</span>
+					);
+				}
+				return part;
+			});
+		}
+		if (React.isValidElement(child) && child.props.children) {
+			return React.cloneElement(child, { children: renderTextWithBadges(child.props.children) });
+		}
+		return child;
+	});
+};
+
 const MessageBubble = ({ message, msgIndex }) => {
 	const isUser = message.role === 'user' || message.role === 'User';
 
@@ -27,61 +71,11 @@ const MessageBubble = ({ message, msgIndex }) => {
 					<div className="text-zinc-200 text-sm leading-relaxed whitespace-pre-wrap">
 						<ReactMarkdown
 							components={{
-								blockquote({ node, children, ...props }) {
-									// Extract text content from children
-									const getTextLines = (childArray) => {
-										let text = '';
-										React.Children.forEach(childArray, (child) => {
-											if (typeof child === 'string') text += child;
-											else if (child?.props?.children) text += getTextLines(child.props.children);
-										});
-										return text;
-									};
-									const rawText = getTextLines(children).trim();
-
-									// Fetch the multi-format selected patterns
-									const match = rawText.match(/^(?:__cite__|selected|comment|cite)\(\s*([^)]+)\s*\)\s*(?:"([^"]+)")?/s);
-
-									if (match) {
-										const parts = match[1].split(',').map(s => s.trim());
-										const msgId = parts[0];
-										let start = 0, stop = 0;
-										if (parts.length === 4) {
-											start = parseInt(parts[2]);
-											stop = parseInt(parts[3]);
-										} else if (parts.length === 3) {
-											start = parseInt(parts[1]);
-											stop = parseInt(parts[2]);
-										}
-
-										const quoteText = match[2] || "Cita extraída";
-										return (
-											<span
-												className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 py-0.5 rounded text-xs font-mono mb-1 mr-1 align-middle cursor-pointer"
-												title={quoteText}
-												onClick={() => {
-													window.dispatchEvent(new CustomEvent('blink-quote-history', { detail: { msgId, start, stop } }));
-												}}
-											>
-												<span className="truncate max-w-[150px] inline-block font-sans text-xs italic">
-													"{quoteText}"
-												</span>
-											</span>
-										);
-									}
-
-									// Standard blockquote fallback
-									return (
-										<span className="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 text-yellow-500 px-1.5 py-0.5 rounded textxs font-mono mb-1 mr-1 align-middle" title={rawText} {...props}>
-											<span className="truncate max-w-[100px] inline-block font-sans text-xs italic">
-												"{rawText}"
-											</span>
-										</span>
-									);
-								},
 								p({ node, children, ...props }) {
-									// ReactMarkdown usually wraps blockquotes in P or strings in P
-									return <p className="mb-2 last:mb-0 inline-block w-full" {...props}>{children}</p>;
+									return <p className="mb-2 last:mb-0 inline-block w-full" {...props}>{renderTextWithBadges(children)}</p>;
+								},
+								li({ node, children, ...props }) {
+									return <li {...props}>{renderTextWithBadges(children)}</li>;
 								},
 								code({ node, inline, className, children, ...props }) {
 									const match = /language-(\w+)/.exec(className || '');

@@ -183,7 +183,7 @@ const ChatArea = () => {
 			};
 			setActiveQuotes(prev => [...prev, newQuote]);
 
-			const payload = `comment(${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${selectionData.occurrenceIndex || 0}, ${start}, ${stop})`;
+			const payload = `[cite](${selectionData.msgIndex !== null ? selectionData.msgIndex : 'unknown'}, ${selectionData.occurrenceIndex || 0}, ${start}, ${stop})`;
 
 			// Crear el nodo HTML del badge (pequeño, 1 línea, sin mostrar el texto adentro)
 			const badgeHtml = `<span contenteditable="false" data-quote-id="${quoteId}" data-quote-payload="${payload}" data-quote-text="${selectionData.text.replace(/"/g, '&quot;')}" onclick="window.dispatchEvent(new CustomEvent('blink-quote', {detail: '${quoteId}'}))" class="inline-flex items-center justify-center gap-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 transition-colors text-yellow-500 px-1.5 rounded text-[11px] font-mono h-[18px] leading-none mx-1 cursor-pointer align-baseline select-none">
@@ -225,7 +225,7 @@ const ChatArea = () => {
 	useEffect(() => {
 		const newHist = [];
 		messages.forEach((msg, idx) => {
-			const regex = />\s*(?:__cite__|selected|comment|cite)\(\s*([^)]+)\s*\)\s*(?:"([^"]+)")?/g;
+			const regex = /´´´\[cite\]\(\s*([^)]+)\s*\)>(.*?)´´´/g;
 			let match;
 			while ((match = regex.exec(msg.content)) !== null) {
 				const parts = match[1].split(',').map(s => s.trim());
@@ -373,8 +373,8 @@ const ChatArea = () => {
 					if (node.tagName === 'SPAN' && node.classList.contains('inline-flex')) {
 						// Es un badge, extraemos el payload con el ID y las coordenadas start/stop
 						const quoteText = node.getAttribute('data-quote-text') || node.textContent;
-						const quotePayload = node.getAttribute('data-quote-payload') || 'selected(unknown)';
-						finalContent += `\n> ${quotePayload} "${quoteText}"\n`;
+						const quotePayload = node.getAttribute('data-quote-payload') || '[cite](unknown)';
+						finalContent += ` ´´´${quotePayload}>${quoteText}´´´ `;
 					} else if (node.tagName === 'DIV' || node.tagName === 'BR') {
 						finalContent += '\n' + node.textContent;
 					} else {

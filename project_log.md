@@ -228,3 +228,15 @@
 - **Problema**: El componente de `ReactMarkdown` renderizaba incorrectamente citas alteradas manualmente en el código fuente (ej. usar estáticamente `cite(...)` como keyword) mostrando comillas rotas llanas (`"cite(...) "div""`) en lugar del Badge interactivo esperado.
 - **Causa**: Los hooks de Regex no capturaban adaptaciones del cliente (como `cite`), derivando al fallback de diseño por defecto.
 - **Solución**: Se amplió la matriz de validación de sintaxis para reconocer `cite` y `comment` nativamente en todo el DOM de React. Además, se configuró el sistema para que transcriba los metadatos internos por defecto al formato demandado explícitamente `comment(msgId, occurrence, start, stop)`, evadiendo definitivamente las debilidades previas y asimilando los cambios locales del usuario.
+
+### 📝 Registro: [v1.42] - Sintaxis Estricta Universal en Línea (`´´´__cite__...´´´`)
+- **Problema**: El modelo subyacente de ReactMarkdown separaba las citas visuales del texto convencional de conversación, obligándolas a vivir en sus propias líneas "Blockquote" (`> tag`). Además el usuario experimentaba fragmentación e inconsistencias al mantener múltiples keywords vivos por compatibilidad temporal (`selected`, `cite`, `comment`) y lidiar con choques típicos de comillas `""`.
+- **Causa**: Limitación estructural del componente originario de render basado estáticamente en Node `blockquote`.
+- **Solución**: 
+  - **Refactorización de Layout**: Se eliminó el motor de blockquotes de `MessageBubble` y se introdujo una función recursiva inyectora (`renderTextWithBadges`) que atrapa patrones sobre nodos genéricos `<p>` y `<li>`. El badge interactivo ahora puede fluir orgánicamente sobre la misma línea conversacional sin romper el layout.
+  - **Single Source of Truth**: Se descartaron todas las variaciones textuales antiguas. A partir de ahora TODO el ecosistema (historiales y nuevos extractos temporales) adoptan la etiqueta irrompible envuelta en acento agudo latino triple: `´´´__cite__(msgId, ocurrencias, start, end)>texto´´´`. Esto elimina cualquier falsa positividad en un chat técnico garantizando que la UI sólo actuará cuando la string coincida con este intrincado meta-patrón.
+
+### 📝 Registro: [v1.43] - Evasión de Estilos Nativos Markdown (`[cite]`)
+- **Problema**: La string literal interna `__cite__` heredada de la v1.42 estaba siendo absorbida accidentalmente por el propio parser `ReactMarkdown` como una solicitud legítima de Bold text (Negrita), transformando de mutuo propio la macroestructura a tags HTML `<strong>cite</strong>`.
+- **Causa**: Los dobles guiones bajos (`__`) son operadores reservados del lenguaje universal Markdown para aplicar énfasis visuales (bold).
+- **Solución**: Reemplazada categóricamente la palabra de invocación nativa por `[cite]`, resultando en la macro `´´´[cite](msgId, occurrence, start, stop)>texto´´´` convirtiéndola en una secuencia gramatical invisible e inmune a las transformaciones core del parseador DOM conversacional.
