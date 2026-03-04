@@ -1,5 +1,6 @@
 import json
 import re
+import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
@@ -41,6 +42,9 @@ def search_google_and_print(query):
         print(f"\n[TOOL OUTPUT] search_google_and_print error:\n{error_msg}\n")
         return error_msg
 
+import asyncio
+import concurrent.futures
+
 def read_web_page(url):
     """
     Reads the content of a web page and returns the text.
@@ -49,26 +53,53 @@ def read_web_page(url):
     if not url.startswith(('http://', 'https://')):
         url = 'https://' + url
 
-    print(f"\n[SYSTEM] Reading web page: {url}...")
+    print(f"\n[SYSTEM] Reading web page using Playwright: {url}...")
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        response = requests.get(url, headers=headers, timeout=15, verify=False)
-        response.raise_for_status()
+        from playwright.sync_api import sync_playwright
         
-        soup = BeautifulSoup(response.text, 'html.parser')
+        def _scrape_sync(target_url):
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                context = browser.new_context(
+                    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    ignore_https_errors=True
+                )
+                page = context.new_page()
+                try:
+                    page.goto(target_url, timeout=20000, wait_until="networkidle")
+                except Exception as e:
+                    print(f"[SYSTEM] Networkidle timeout or error, proceeding with available content: {e}")
+                
+                page.wait_for_timeout(1000)
+                html = page.content()
+                browser.close()
+                return html
+
+        # To avoid the "Playwright Sync API inside asyncio loop" error in FastAPI,
+        # we run the sync Playwright code in a separate thread.
+        try:
+            # Check if we are in an event loop
+            loop = asyncio.get_running_loop()
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                # Use nest_asyncio or just run_in_executor to blockingly wait for the result
+                import nest_asyncio
+                nest_asyncio.apply()
+                future = pool.submit(_scrape_sync, url)
+                html_content = future.result(timeout=30)
+        except RuntimeError:
+            # No running event loop, this means we are in a normal sync script like a test
+            html_content = _scrape_sync(url)
+
+        soup = BeautifulSoup(html_content, 'html.parser')
         
         # Remove non-content elements to clean up the text
         for element in soup(['script', 'style', 'nav', 'header', 'footer', 'noscript', 'aside']):
             element.decompose()
             
         # Extract all text, replace consecutive spaces/newlines with a single space
-        import re
         text_content = soup.get_text(separator=' ', strip=True)
         text_content = re.sub(r'\s+', ' ', text_content).strip()
+        
         # Limit content length to avoid context window explosion
         max_chars = 4000
         if len(text_content) > max_chars:
