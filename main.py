@@ -222,6 +222,9 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import glob
+import datetime
+
+from history_manager import HistoryManager
 
 app = FastAPI(title="LM-Studio Custom Chat API", version="1.8")
 
@@ -242,6 +245,12 @@ UPLOAD_DIR = "history-chat/uploads" # For simplicity, putting uploads inside his
 os.makedirs(HISTORY_DIR, exist_ok=True)
 os.makedirs(GENERATED_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+history_worker = HistoryManager(HISTORY_DIR)
+
+@app.on_event("startup")
+async def startup_event():
+    history_worker.start_worker()
 
 
 class ChatRequest(BaseModel):
@@ -274,9 +283,19 @@ async def chat_endpoint(request: ChatRequest):
 
     messages = [{"role": "system", "content": system_prompt}]
     
+    history_id = request.history_id
+    is_new_chat = False
+    if not history_id:
+        history_id = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+        is_new_chat = True
+        
+    if is_new_chat:
+        await history_worker.enqueue_message(history_id, "system", system_prompt)
+
     # In a real app, we would load existing history from HISTORY_DIR based on request.history_id here
     # For now, we simulate starting fresh or appending to memory if we had a persistent store per session.
     messages.append({"role": "user", "content": request.message})
+    await history_worker.enqueue_message(history_id, "user", request.message)
 
     try:
         completion = client.chat.completions.create(
@@ -356,9 +375,14 @@ async def chat_endpoint(request: ChatRequest):
         
         if tool_calls:
             print(f"\n[RAW TOOL CALL] Model requested:\n{tool_calls}\n")
+            
+            if response_message.content:
+                await history_worker.enqueue_message(history_id, "assistant_thought", response_message.content)
+            
             # Agregamos la versión dict si se usó fallback, de lo contrario la normal
             if response_message_dict:
                 messages.append(response_message_dict)
+                await history_worker.enqueue_message(history_id, "assistant_tool_call", json.dumps(response_message_dict["tool_calls"]))
             else:
                 # Construir manualmente el dict nativo para evitar crashes de serialización
                 tool_calls_list = []
@@ -376,6 +400,7 @@ async def chat_endpoint(request: ChatRequest):
                     "content": response_message.content,
                     "tool_calls": tool_calls_list
                 })
+                await history_worker.enqueue_message(history_id, "assistant_tool_call", json.dumps(tool_calls_list))
             
             for tool_call in tool_calls:
                 function_name = tool_call.function.name
@@ -395,6 +420,7 @@ async def chat_endpoint(request: ChatRequest):
                     "name": function_name,
                     "content": function_response or ""
                 })
+                await history_worker.enqueue_message(history_id, "tool_result", str(function_response or ""))
             
             second_response = client.chat.completions.create(
                 model="model-identifier",
@@ -409,8 +435,9 @@ async def chat_endpoint(request: ChatRequest):
             final_content = final_content.replace("[TOOL_RESULT]", "").replace("[END_TOOL_RESULT]", "").strip()
 
         # Save history logic would go here
+        await history_worker.enqueue_message(history_id, "assistant", final_content)
         
-        return {"response": final_content, "role": "assistant"}
+        return {"response": final_content, "role": "assistant", "history_id": history_id}
 
     except Exception as e:
         print(f"\nError: {e}")
@@ -422,17 +449,44 @@ async def get_history_list():
     files = glob.glob(os.path.join(HISTORY_DIR, "*.json"))
     history_list = []
     for f in files:
-        history_list.append({"id": os.path.basename(f), "name": os.path.basename(f).replace(".json", "")})
+        basename = os.path.basename(f).replace(".json", "")
+        history_list.append({"id": basename, "name": basename})
     return history_list
 
 @app.get("/api/history/{history_id}")
 async def get_history_detail(history_id: str):
     """Returns the details of a specific conversation."""
+    if history_id.endswith(".json"):
+        history_id = history_id[:-5]
     file_path = os.path.join(HISTORY_DIR, f"{history_id}.json")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="History not found")
     with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+        
+    messages_list = []
+    sorted_keys = sorted([k for k in data.keys() if k.isdigit()], key=int)
+    for key in sorted_keys:
+        entry = data[key]
+        role = None
+        content = ""
+        tags = entry.get("tags", [])
+        
+        for k, v in entry.items():
+            if k != "tags":
+                role = k
+                content = v
+                break
+                
+        if role:
+            messages_list.append({
+                "role": "system" if "system" in role else ("assistant" if "assistant" in role else "user"),
+                "content": content,
+                "tags": tags,
+                "original_role": role
+            })
+            
+    return {"messages": messages_list}
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):

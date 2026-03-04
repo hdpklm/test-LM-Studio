@@ -9,6 +9,7 @@ export const ChatProvider = ({ children }) => {
 	const [historyList, setHistoryList] = useState([]);
 	const [generatedFiles, setGeneratedFiles] = useState([]);
 	const [currentChatId, setCurrentChatId] = useState(null);
+	const [chatMode, setChatMode] = useState("free"); // free, syspro, longloop
 
 	// Fetch initial data
 	const fetchData = async () => {
@@ -37,6 +38,7 @@ export const ChatProvider = ({ children }) => {
 			historyList, setHistoryList,
 			generatedFiles, setGeneratedFiles,
 			currentChatId, setCurrentChatId,
+			chatMode, setChatMode,
 			fetchData
 		}}>
 			{children}

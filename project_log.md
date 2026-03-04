@@ -142,17 +142,145 @@
 - **Causa**: Limitación cognitiva del LLM local de 1B. Para él, una página con "14 palabras" es anómala (sin menús, ni artículos, ni HTML común), así que en vez de transcribirlo textualmente deduciendo que es un sitio en construcción o una respuesta REST, "alucina" disculpándose y diciendo que la web no tiene utilidad/contenido extraíble.
 - **Solución**: Se añadió una directiva estricta al `system_prompt` que detecta este patrón. Ahora el sistema le dicta: *"Si una herramienta devuelve un texto muy corto, NUNCA digas que no hay contenido. En su lugar, cita el texto exacto devuelto y deduce que la página podría estar en construcción o ser un archivo raw"*. Obligando al LLM a comportarse como un proxy fiel.
 
-### 📝 Registro: [v1.27] - Fix Extracción en Dominios con Redirección Meta/JS (SPA)
+### 📝 Registro: [v1.27] - Inicialización Agente Guiones YouTube
+- **Problema**: El usuario requiere un prompt especializado (un agente) para la redacción de guiones de YouTube.
+- **Causa**: Nueva característica solicitada para crear un workflow de agente de guiones.
+- **Solución**: Se creó el archivo inicial `PlanesDeTranajo/creador_guiones_youtube.mini.md` y se añadió su registro. Se incrementó la versión a v1.27.
+
+### 📝 Registro: [v1.28] - Mejoras de UI e Integración frontend por agente externo (Trae)
+- **Problema**: Mejoras en la interfaz de chat (citado de texto, transiciones del cajón izquierdo y selección de agentes) y estabilización de las dependencias base.
+- **Causa**: Uso del editor inteligente `trae` por el usuario para agilizar el diseño.
+- **Solución**: 
+  - **Backend/Config**: Se agregaron `fastapi`, `uvicorn`, `python-multipart` a `requirements.txt`. En `react-web/package.json` se bajó la versión de `vite` a ^5.4.11 y `@vitejs/plugin-react` a ^4.3.4 para asegurar compatibilidad.
+  - **React Context**: Agregado el estado `chatMode` en `ChatContext.jsx`.
+  - **UI/UX Componentes**: En `LeftDrawer.jsx` la posición cambió de `fixed` a `relative` con transiciones de ancho sin ocultar el contenido, y se agregó la sección "Agents". En `ChatArea.jsx` se incluyó un botón flotante reactivo al seleccionar texto que permite agregarlo como una cita ("quote") resaltada en el input antes de mandar el mensaje.
+
+### 📝 Registro: [v1.29] - Fix UI de Badge de Selección/Cita en ChatArea
+- **Problema**: El selector de texto no renderizaba el badge correctamente y desalineaba el input del chat. El highlight amarillo desaparecía.
+- **Causa**: El rediseño estructural de flexbox y la ubicación condicional del badge de "Quote" interrumpían la fluidez de flex-row del text-area de envío, y su posicionamiento absoluto estaba perdiendo clases relativas.
+- **Solución**: Se modificó el form contenedor en `ChatArea.jsx` a `flex-col`, moviendo el badge de cita al interior superior del text-area con un estilo de highlight integrado. Se aplicaron clases `shrink-0` a los iconos para que no colapsasen al inyectar texto.
+
+### 📝 Registro: [v1.30] - Múltiples Citas In-line (ContentEditable)
+- **Problema**: El textbox no permitía introducir más de un badge de cita, y el badge estaba atado al input genérico apareciendo siempre de primero, rompiendo la experiencia de intercalar citas durante la redacción.
+- **Causa**: `<textarea>` de HTML no soporta la inyección de nodos/elementos HTML interactivos y todo el diseño descansaba sobre un Render Condicional superior que estorbaba.
+- **Solución**: Se reemplazó el `<textarea>` del `ChatArea.jsx` por un `<div>` con la propiedad `contentEditable`. Ahora al seleccionar texto y apretar el botón de Add To Input, se inyecta un badge dinámico (`span` con clases de Tailwind amarillas) directamente en la posición de texto deseada (o al final) del cuadro de chat. Al enviar, un parser virtual extrae los nodos de texto y formatea los tags amarillos temporalmente visuales en citas literales Markdown `> [texto]` para pasárselo al backend limpiamente.
+
+### 📝 Registro: [v1.31] - Fix Badges Multilínea y Pérdida de Focus de Citas
+- **Problema**: Los badges generados previamente mostraban demasiada información ocupando múltiples líneas si se copiaban citas largas. Además, el texto seleccionado (particularmente en bloques de código) desaparecía al intentar hacer click en su botón flotante amarillo.
+- **Causa**: El handler del evento gloal `handleMouseDown` y las pseudo-clases css del badge no estaban restringidas limitando al usuario. Al clickar el botón flotante, el navegador interpretaba la pérdida de foco en componentes anidados como blurs de selección de texto puro, borrando el string retenido.
+- **Solución**: En `ChatArea.jsx`, se modificó el layout HTML que inyecta el `insertHTML` del badge limitándolo a una altura dura de `18px`, con formato monoespaciado y con el innerText reemplazado por un contador semántico corto (`sel-1`, `sel-2`). El texto a citar está ahora abstraído y almacenado de forma segura en el atributo `data-quote-text` para que el backend parser lo pueda extraer al enviar. Se parcheó la pérdida de foco limitando condicionalmente el evento mousedown en botones personalizados.
+
+### 📝 Registro: [v1.32] - Fix Posición de Inserción de Citas (Cursor Persistence)
+- **Solución**: Se integró un `savedRangeRef` en `ChatArea.jsx` que archiva continuamente (`onInput`, `onKeyUp`, `onMouseUp`, `onBlur`) la posición del cursor siempre que esté dentro de la caja de texto. Al insertar la cita, React ahora restaura forzosamente este rango (`getSelection().addRange()`) antes de incrustar el HTML, asegurando que el badge cae exactamente donde se escribió la última letra.
+
+### 📝 Registro: [v1.33] - Render Customizado de Citas en MessageBubble
+- **Problema**: Tras el envío, el backend y el LLM procesan el "badge amarillo temporal" como código puro Markdown (`> cita`), lo que causaba que en la UI del historial de chat, el mensaje del usuario se mostrara como un enorme bloque de cita crudo (`blockquote` tradicional), ocupando mucho espacio visual y confundiendo la experiencia de usuario.
+- **Causa**: `react-markdown` usaba su nodo por defecto para la etiqueta `<blockquote>`.
+- **Solución**: En `MessageBubble.jsx` se sobrescribió el comportamiento de `blockquote` inyectando un componente personalizado de React. Ahora, cuando detecta un blockquote, en lugar de pintar una muralla de texto, extrae todo el NodeText iterando sus hijos y renderiza únicamente un badge compacto, simulando el estilo visual amarillo original ("sel-X") seguido del texto truncado, volviendo el mensaje final a un simple párrafo fluido.
+
+### 📝 Registro: [v1.34] - Soporte de Selector de Citas en Bloques de Código/LiveEditor
+- **Problema**: Era imposible seleccionar código renderizado por el LLM para citarlo. Al intentar remarcar algo en un fragmento de Python o React, el botón flotante (+) deseleccionaba el texto o directamente no lo captaba.
+- **Causa**: Los fragmentos de código, especialmente al usar `react-live` (`LiveEditor`), ocultan el texto detrás de un `<textarea>` superpuesto transparente. El método nativo del navegador `window.getSelection()` solo funciona para nodos de texto DOM regulares (tags p, div, span) y siempre arroja un string vacío o nulo si el foco está en un `input` o `textarea` de formulario embebido.
+- **Solución**: Se parcheó el evento `handleMouseUp` en `ChatArea.jsx`. Ahora comprueba primero qué tipo de elemento tiene el foco (`document.activeElement`). Si detecta que es un `<textarea>` o `<input>`, extrae la posición y el texto usando las propiedades `selectionStart` y `selectionEnd` del elemento, evitando el motor convencional de `getSelection` y garantizando que se pueden citar variables o líneas abstractas de los programadores.
+
+### 📝 Registro: [v1.35] - Resaltado Bidireccional de Citas y Coordenadas Locales Espaciales
+- **Problema**: Faltaba feedback visual; el usuario no sabía a qué parte del historial de chat correspondía cada badge "sel-X" insertado en el input. Adicionalmente, el LLM recibía la cita como texto literal, y en contextos largos podía no saber exactamente desde qué mensaje se citó.
+- **Causa**: Limitación de diseño en la abstracción inicial de la cita, que sólo guardaba un string de texto y omitía inyectar información de coordenadas en los nodos DOM reactivos.
+- **Solución**: 
+  - **Coordenadas**: `MessageBubble.jsx` ahora transfiere un `data-message-index` al DOM. El capturador de texto extrae el inicio, el final y el ID del mensaje utilizando un indexador de strings en crudo. El payload de metadatos se transformó a `selected(id, start, stop)`, siendo este el nuevo formato que leerá el LLM al procesar el mensaje enviado por el usuario.
+  - **Identidad Visual**: Se reintrodujo un Motor de Resaltado reactivo en `ChatArea.jsx` que levanta capas amarillas absolutas (`getClientRects()`) encima del historial, vinculadas uno a uno con los badges presentes en el `contentEditable`.
+  - **Interactividad**: Los badges pasaron a ser clickeables, despachando un evento global `blink-quote` que induce un parpadeo temporal CSS en el área resaltada original.
+
+### 📝 Registro: [v1.36] - Estabilización de Historial (React.memo) y Fallbacks de Resaltado
+- **Problema**: Al intentar seleccionar y añadir una cita (incluso con v1.35), la caja se deseleccionaba bruscamente, resultando en que la cita se perdía. Adicionalmente, los bloques de código (al basarse en textareas ocultos de `react-live`) no podían generar rectángulos absolutos, omitiendo el resaltado en pantalla.
+- **Causa**: Cada vez que se invocaba `setSelectionData`, React gatillaba un re-render general de `ChatArea`. Esto forzaba a que `MessageBubble` se reevaluase, y por ende, `LiveEditor` destruía y recreaba su estado interno, provocando la caída de la selección del navegador.
+- **Solución**: 
+  - **Estabilización de Dom**: Se encapsuló `MessageBubble.jsx` dentro de un `React.memo()`. Esto detuvo completamente los re-renders innecesarios del historial de chat cada vez que la barra inferior interactiva cambia, persistiendo tanto el `<textarea>` nativo como los objetos `DOM Range` estáticos en memoria.
+  - **Fallback de Highlights**: Para lidiar matemáticamente con los bloques de código, a los extractos provenientes de Textareas (`textarea_fake_range`) se les asignó un Renderizado de Respaldo (`isFallback: true`) en el motor de resaltado, dibujando un borde sólido amarillo y un sombreado leve en todo el componente del mensaje que los contiene en lugar de intentar trazar el texto con precisión letal.
+
+### 📝 Registro: [v1.37] - Traspaso de Data Espacial (Start/Stop) hacia el LLM
+- **Problema**: A pesar de que la UI de react procesaba internamente las variables posicionales (ID del mensaje en array, Start del String y Longitud) introducidas en la v1.35, el analizador subyacente de la caja de texto al momento de presionar el botón "Enviar" las descartaba, omitiendo esta información táctica necesaria para que el modelo IA pudiese rastrear qué punto exacto se seleccionó sin ambigüedades de strings repetidos.
+- **Causa**: Al convertir los nodos DOM a texto llano en `handleSend`, sólo se pasaba la propiedad pura `quoteText`.
+- **Solución**: Se modificó `handleSend` en `ChatArea.jsx` y ahora extrae explícitamente el atributo compuesto precalculado `data-quote-payload`. Las citas formateadas enviadas en el prompt al backend cambian a: `> selected(ID, start, stop) "Texto Citado"`, sirviendo tanto como un fallback legible para humanos como una vectorización útil de instrucciones al sistema de IA.
+
+### 📝 Registro: [v1.38] - Persistencia del Resaltado en Historial y Parseo Final
+- **Problema**: Cuando el usuario enviaba el mensaje con las insignias (badges), o cuando recargaba el chat desde el historial antiguo, las cajas de fondo amarillo en los mensajes originales citados desaparecían porque el estado en memoria de React se reiniciaba. Adicionalmente, hacer clic en los badges antiguos (ya enviados) no emitía ningún destello de localización.
+- **Causa**: El motor de layout de capas superpuestas (Highlight Rectangles) solo leía el estado `activeQuotes` (aquellas atadas a la caja de introducción de texto), ignorando por completo la memoria muerta del componente renderizado por Markdown (`MessageBubble.jsx`).
+- **Solución**: 
+  - **Parsing en Markdown**: Se introdujo una regla regex en el parser personalizado `blockquote` de `MessageBubble.jsx` que intercepta comandos como `> selected(X, Y, Z) "Texto"` y los recompila visualmente a pequeños botones flotantes clickeables que difunden la señal CSS hacia el historial usando `blink-quote-history`.
+  - **TreeWalker DOM Absoluto**: Se introdujo una rutina asíncrona en `ChatArea.jsx` que, al actualizarse el historial de mensajes, escanea recurrentemente (usando `document.createTreeWalker`) todos los nodos de la página buscando coincidencias físicas basándose en la metadada. Si las halla, extrapola coordenadas de Rango Nativas (`createRange()`) y levanta las mismas láminas amarillas de fondo tanto para citas reactivas como para citas históricas archivadas.
+
+### 📝 Registro: [v1.39] - Corrección de Colisión Lingüística y Tracking Recursivo (`occurrenceIndex`)
+- **Problema**: El analizador estático fallaba si el texto del usuario incluía naturalmente la palabra "selected(..." o si seleccionaba una palabra muy genérica como "a" que ya existiera en el mismo mensaje. Al recargar el historial, el parser encendía el fondo amarillo de la primera palabra "a" que viera en lugar de la que el usuario marcó realmente.
+- **Causa**: Limitación en el parser visual del DOM, que buscaba la primera coincidencia usando `indexOf()`, y uso de un keyword ("selected") muy susceptible a falsos positivos en conversaciones técnicas de programación.
+- **Solución**: 
+  - **Keyword Fuerte**: Sustituido el marcador base en los prompts por `__cite__(msgId, occurrence, start, stop)` para virtualmente imposibilitar que se accione un botón flotante por accidente al hablar de código.
+  - **Variable Ocurrencia**: Se inyectó en el capturador nativo de `handleMouseUp` un mini-algoritmo que cuenta matemáticamente (vía substrings) cuántas veces aparece ese mismo texto en el párrafo antes de hacer la selección del ratón. Este valor precalculado (`occurrenceIndex`) viaja incrustado en el meta-tag y permite que, al regresar desde el historial o servidor, el `TreeWalker` ilumine la ocurrencia N.º precisa.
+
+### 📝 Registro: [v1.40] - Compatibilidad Universal de Keywords y Destellos por Coordenadas
+- **Problema**: Mensajes del historial generados en versiones anteriores (v1.38 o betas) que utilizaban palabras clave como `selected(id, s, e)` o formatos sugeridos ignoraban la nueva regla estricta de `__cite__`. En consecuencia, el historial no mostraba ni el subrayado ni parpadeaba al hacerles clic. Además, el parpadeo del historial se basaba en el texto exacto, lo que fallaba a causa de diferencias por espacios en blanco manejados por el DOM.
+- **Causa**: Las expresiones regulares estaban fuertemente tipadas en React y dependientes del string literal.
+- **Solución**: 
+  - **Regex Multi-Sintaxis**: Se actualizó el Regex en `ChatArea.jsx` y `MessageBubble.jsx` a `(?:__cite__|selected|comment)` para leer simultáneamente formatos antiguos de 3 parámetros y el nuevo estándar de 4 parámetros de forma nativa e iterativa.
+  - **Parpadeo Espacial Geométrico**: Ahora el interceptador de clics del usuario en eventos pasados despacha las coordenadas exactas `start` y `stop` para encontrar al clon iluminado, abandonando el viejo método de machear strings y evadiendo los clásicos problemas de parseos invisibles de HTML.
+
+### 📝 Registro: [v1.41] - Permisividad Dinámica y Migración a `comment()`
+- **Problema**: El componente de `ReactMarkdown` renderizaba incorrectamente citas alteradas manualmente en el código fuente (ej. usar estáticamente `cite(...)` como keyword) mostrando comillas rotas llanas (`"cite(...) "div""`) en lugar del Badge interactivo esperado.
+- **Causa**: Los hooks de Regex no capturaban adaptaciones del cliente (como `cite`), derivando al fallback de diseño por defecto.
+- **Solución**: Se amplió la matriz de validación de sintaxis para reconocer `cite` y `comment` nativamente en todo el DOM de React. Además, se configuró el sistema para que transcriba los metadatos internos por defecto al formato demandado explícitamente `comment(msgId, occurrence, start, stop)`, evadiendo definitivamente las debilidades previas y asimilando los cambios locales del usuario.
+
+### 📝 Registro: [v1.42] - Sintaxis Estricta Universal en Línea (`´´´__cite__...´´´`)
+- **Problema**: El modelo subyacente de ReactMarkdown separaba las citas visuales del texto convencional de conversación, obligándolas a vivir en sus propias líneas "Blockquote" (`> tag`). Además el usuario experimentaba fragmentación e inconsistencias al mantener múltiples keywords vivos por compatibilidad temporal (`selected`, `cite`, `comment`) y lidiar con choques típicos de comillas `""`.
+- **Causa**: Limitación estructural del componente originario de render basado estáticamente en Node `blockquote`.
+- **Solución**: 
+  - **Refactorización de Layout**: Se eliminó el motor de blockquotes de `MessageBubble` y se introdujo una función recursiva inyectora (`renderTextWithBadges`) que atrapa patrones sobre nodos genéricos `<p>` y `<li>`. El badge interactivo ahora puede fluir orgánicamente sobre la misma línea conversacional sin romper el layout.
+  - **Single Source of Truth**: Se descartaron todas las variaciones textuales antiguas. A partir de ahora TODO el ecosistema (historiales y nuevos extractos temporales) adoptan la etiqueta irrompible envuelta en acento agudo latino triple: `´´´__cite__(msgId, ocurrencias, start, end)>texto´´´`. Esto elimina cualquier falsa positividad en un chat técnico garantizando que la UI sólo actuará cuando la string coincida con este intrincado meta-patrón.
+
+### 📝 Registro: [v1.43] - Evasión de Estilos Nativos Markdown (`[cite]`)
+- **Problema**: La string literal interna `__cite__` heredada de la v1.42 estaba siendo absorbida accidentalmente por el propio parser `ReactMarkdown` como una solicitud legítima de Bold text (Negrita), transformando de mutuo propio la macroestructura a tags HTML `<strong>cite</strong>`.
+- **Causa**: Los dobles guiones bajos (`__`) son operadores reservados del lenguaje universal Markdown para aplicar énfasis visuales (bold).
+- **Solución**: Reemplazada categóricamente la palabra de invocación nativa por `[cite]`, resultando en la macro `´´´[cite](msgId, occurrence, start, stop)>texto´´´` convirtiéndola en una secuencia gramatical invisible e inmune a las transformaciones core del parseador DOM conversacional.
+
+### 📝 Registro: [v1.44] - Guardado de Historial con Etiquetas IA (Append-Only)
+- **Problema**: El historial de chat no se guardaba por sesión ni se etiquetaba, y guardar reescribiendo el archivo completo daña los ciclos de escritura del SSD del usuario.
+- **Causa**: Faltaba una funcionalidad persistente y segura para almacenar conversaciones individuales.
+- **Solución**: Se creó `history_manager.py` con una cola asíncrona (`asyncio.Queue`) que procesa cada mensaje en segundo plano. Mediante múltiples pasadas de LLM (3 extracciones + 1 consenso), genera etiquetas relevantes de búsqueda. Por bioseguridad del hardware (SSD), el JSON se manipula a nivel de bytes (`open('r+b')`), sobreescribiendo el último `}` para añadir los nuevos nodos iterativamente, operando como un append estricto sin reescrituras masivas. Se vinculó esto a `main.py` pasándole cada interacción nativa.
+
+### 📝 Registro: [v1.45] - Trim Espacial Dinámico
+- **Problema**: El capturador nativo de selecciones del navegador web capturaba espacios en blanco adicionales que el usuario arrastraba de más sin querer (ej. `"   hola  "`), ocasionando que el badge ocupara innecesario ancho de pantalla e iluminara huecos en el diseño.
+- **Causa**: Limitación técnica del cursor general del sistema.
+- **Solución**: Un algorítmo matemático auto-trim `while` en cascada inyectado sobre `ChatArea.jsx`. Cuando el usuario levanta el click (mouseup) analiza si en el `rawText` de la posición original las letras correspondientes a `start` y `stop` equivalen a vacíos (`\\s`). De ser así, aprieta los punteros hasta llegar al texto puro, acortando la selección final que emite hacia el badge.
+
+### 📝 Registro: [v1.46] - Fix Payload del Historial Frontend vs Backend
+- **Problema**: El frontend devolvía una pantalla vacía o fallaba silenciosamente al intentar recuperar el historial de chat anterior después de la implementación de `history_manager.py`.
+- **Causa**: El archivo JSON `{history_id}.json` guarda los datos en forma de objeto dictado con strings indexadas (`"0": {"user":...}`) según los requerimientos solicitados para no corromper la lectura secuencial, pero `React` esperaba un array literal `messages` con un formato plano `[{role: "user", content: "..."}]`.
+- **Solución**: Se actualizó el endpoint `get_history_detail` de `main.py` para no servir el JSON en crudo, sino iterar el diccionario backend, extraer las llaves internas (roles, tags) e inyectarlas en un Array List estandarizado (`{"messages": [...] }`) haciéndolo 100% compatible con el parser de `ChatArea.jsx`.
+
+### 📝 Registro: [v1.47] - Fix Duplicidad .json al Añadir Historial
+- **Problema**: Cuando el usuario enviaba un nuevo mensaje en un chat antiguo cargado, el backend creaba un nuevo archivo llamado `{id}.json.json` en lugar de continuar escribiendo en el original.
+- **Causa**: Al cargar el chat antiguo, la variable `currentChatId` que viajaba al backend incluía la extensión, y la clase `HistoryManager` volvía a concatenar ciegamente `+ ".json"` al construir el path de lectura/escritura (`file_path`).
+- **Solución**: Se insertó una cláusula condicional de saneamiento (`history_id.endswith('.json')`) dentro de `_process_and_save` en `history_manager.py` para rebanar (`[:-5]`) cualquier sufijo residual antes de abrir el puntero `r+b`.
+### 📝 Registro: [v1.48] - Ocultar System Prompts al Cargar Historial
+- **Problema**: Cuando el usuario abría un chat del historial, la interfaz de React mostraba el inmenso bloque del "System Prompt" como un mensaje normal, lo que ensuciaba la lectura de la conversación de cara al usuario.
+- **Causa**: El endpoint `/api/history/{id}` leía y volcaba todos los mensajes iterativamente, careciendo de un filtro para descartar intencionalmente el rol `system` al preparar el payload del frontend.
+- **Solución**: Se añadió una condicional `if role and role != "system":` en `main.py` antes de inyectar el nodo en la lista `messages_list`, filtrando satisfactoriamente las instrucciones de sistema.
+
+### 📝 Registro: [v1.49] - System Prompt UI Colapsable
+- **Problema**: Ocultar completamente el System Prompt desde el backend impedía al usuario comprobar bajo qué reglas o personalidad se originó ese chat en concreto, quitando contexto importante si el chat era antiguo.
+- **Causa**: Limitación de la solución anterior que purgaba el mensaje.
+- **Solución**: Se reactivó la emisión del rol `system` en `main.py`. A nivel Frontend, se expandió `MessageBubble.jsx` agregando una lógica condicional `isSystem`. Si pertenece al sistema, se envuelve en un div con `overflow-hidden` forzado a un alto máximo (`max-h-16`) junto a un overlay visual (`bg-gradient-to-t pointer-events-none`). Un botón inferior interactúa con el estado `isExpanded` para desplegar temporalmente la lectura del bloque completo cuando el usuario lo solicite explícitamente.
+
+### 📝 Registro: [v1.50] - Fix Extracción en Dominios con Redirección Meta/JS (SPA)
 - **Problema**: Al buscar URLs como `keito.com`, la herramienta solo devolvía el título ("Keito Vital System") pero ningún contenido principal. 
 - **Causa**: Limitación de Scraping Estático. `keito.com` contiene una redirección HTML silenciosa (`<meta http-equiv="refresh" url="./Keito">`) la cual `requests` no sigue por defecto. Al seguir esa redirección manualmente, el destino final resultaba ser una app JS de lado de cliente (SPA) que usaba `window.location.replace` para detectar el idioma del visitante ('Detecting language...') y redirigirlo de nuevo a `/Keito/es`. Python HTTP Requests no procesa ni ejecuta Javascript, por lo que cortaba la lectura ahí, ciego al destino real.
 - **Solución**: Se implementó un parser pasivo en `read_web_page` que extrae y sigue (1 sola vez con `urllib.parse.urljoin`) cualquier etiqueta *Meta Refresh* que exista en el `<head>`. Para frenar las redirecciones ciegas de JS, se implementó un *Heuristic Warning*: si el scraper detecta scripts con la instrucción `window.location` y el contenido legible final es engañosamente corto (<500 chars), inyecta automáticamente un `[SYSTEM WARNING]` al LLM. Esto le chiva al modelo que topó contra un muro de JavaScript impenetrable y lo instruye para pedirle amablemente al usuario la ruta URL específica o final del idioma (ej: `keito.com/Keito/es`) a la que sí se puede raspar sin JS.
 
-### 📝 Registro: [v1.28] - Integración de Playwright para Renderizado de Javascript Completo
+### 📝 Registro: [v1.51] - Integración de Playwright para Renderizado de Javascript Completo
 - **Problema**: A pesar de los avisos del sistema implementados en la versión v1.27, el usuario deseaba que la herramienta de lectura web pudiera procesar activamente páginas hechas con frameworks JS como React, Angular o SPAs completas que emiten redirecciones cliente (`window.location`) y requieren renderización en tiempo real de componentes DOM.
 - **Causa**: Limitación fundamental de librerías tipo HTTP Request (como la gema `requests` y `BeautifulSoup`). Solo interactúan con el código estático primigenio devuelto por el primer paquete HTTP y son ciegas a la capa gráfica dictada por Javascript.
 - **Solución**: Se sustituyó por completo el motor de la herramienta `read_web_page`. Se eliminó la dependencia `requests` junto con todos los hacks obsoletos (lector manual de Meta Refresh, advertencias de JS Location, inyecciones Header falsas) implementados antes. Se integró `playwright` (Chromium Mode Headless). El agente levanta silenciosamente una verdadera ventana de navegador y usa `wait_until="networkidle"` permitiendo un retardo inteligente de hasta 20s para que todas las redirecciones automáticas (ej: Keito Language Selector) y el framework React terminen su trabajo de visualización "pintando" el código HTML final antes de succionar el DOM hacia `BeautifulSoup`.
 
-### 📝 Registro: [v1.29] - Fix Colisión Playwright vs FastAPI Event Loop
+### 📝 Registro: [v1.52] - Fix Colisión Playwright vs FastAPI Event Loop
 - **Problema**: Al pedirle al modelo que raspara una URL en la interfaz de chat real, el backend estallaba con el error: `It looks like you are using Playwright Sync API inside the asyncio loop`.
 - **Causa**: `fastapi` es un framework puramente asíncrono y gestiona cada endpoint usando un Event Loop general de `asyncio`. Playwright detecta que estás llamando a su versión sincrónica (`sync_playwright`) dentro del loop principal de red de Python, lo cual es altamente peligroso porque bloquea al servidor entero para todos los usuarios mientras el scraper carga Chrome y renderiza una web durante 10 segundos. Playwright se aborta como medida de seguridad.
 - **Solución**: Para mantener el código sencillo pero 100% thread-safe y non-blocking, se envolvió todo el núcleo de scraping de Playwright en un *ThreadPoolExecutor* de `concurrent.futures`. Usando `nest_asyncio.apply()`, empujamos la inicialización pesada y bloqueante de Chromium hacia un Thread en background independiente, permitiendo que FastAPI y la API del Chat sigan fluyendo suavemente en el event loop principal sin cuelgues mientras Playwright trabaja en las sombras aisledo. Se actualizó el `requirements.txt`.
