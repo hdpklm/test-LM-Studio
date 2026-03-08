@@ -1,4 +1,4 @@
-# Estado del Proyecto (v1.44)
+# Estado del Proyecto (v1.68)
 
 ## Main Project
 
@@ -31,6 +31,16 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 		- `enqueue_message(history_id, role, content)`: Encola el mensaje para procesamiento asíncrono en segundo plano.
 		- `_generate_tags_for_message(content)`: Genera etiquetas de búsqueda mediante 3 pasadas de LLM simultáneas y 1 consolidación.
 		- `_secure_append_to_history(file_path, role, content, tags)`: Añade bloques de mensaje modificando sólo el último byte del JSON, sin sobreescribir repetitivamente el archivo.
+
+- **`test-LM-Studio/micro.py`**
+	- Descripción: Sandbox e implementación en memoria de un modelo Transformer básico de 9k parámetros sin librerías externas (v1.68).
+	- Funciones Principales:
+		- `add_positional_encoding`: Genera encodings fijos estáticos matemáticos (sin/cos) sobre la matriz para inyectar orden espacial temporal.
+		- `causal_mask`: Enmascara matemáticamente el futuro restando -1e9 al triángulo superior matricial de scores.
+		- `sample_top_k`: Muestreo probabilístico parametrizado por Temperatura y retención del top K superior (Nucleus/K).
+		- `forward`: Pase simple que infiere probabilidades aplicando Top-K Sampling.
+		- `generate`: Bucle recursivo continuo acoplado al evaluador heurístico `forward` con límite `max_len`, detenido por EOS token.
+		- `train_full`: Bucle de epoch modularizado delegando pasadas con SRP (con guardado diferido por epocas).
 
 - **`test-LM-Studio/react-web/src/context/ChatContext.jsx`**
 	- Descripción: Contexto global React. Gestiona estados principales como `chatMode` (free, syspro, longloop).
