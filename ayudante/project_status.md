@@ -1,5 +1,9 @@
 # Estado del Proyecto: Ayudante (v1.5.2)
 
+## Modelos utilizados
+- **`google/gemma-3-1b`**
+- **`qwen3-coder-235b-a3b-instruct-2507`**
+
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
 
