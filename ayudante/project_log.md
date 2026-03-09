@@ -40,3 +40,15 @@
     - Lógica de escalado: El asistente pregunta cada 5m, 10m, 20m... hasta 4h si el usuario no responde.
     - Se añadieron Timestamps visibles en el frontend para cumplir con el requisito de control horario exacto.
 
+### 📝 Registro: [v1.5.1] - Estabilización de Check-ins y Fallbacks
+- **Problema**: El asistente a veces enviaba burbujas vacías si los filtros anti-JSON cortaban toda la respuesta. El intervalo de 5m era demasiado frecuente.
+- **Causa**: Falta de contenido tras limpieza de alucinaciones y valor por defecto muy bajo.
+- **Solución**: Se aumentó el intervalo base a 10m y se añadió un texto de fallback ("Entendido" / "Acciones realizadas") para evitar mensajes vacíos.
+
+### 📝 Registro: [v1.5.2] - Control Dinámico de Inactividad (Heartbeat)
+- **Problema**: El intervalo de inactividad era estático y no permitía al asistente adaptarse a tareas largas o complejas.
+- **Causa**: Rigidez en el diseño del monitor de fondo.
+- **Solución**: 
+    - Se añadió la herramienta `set_checkin_interval(minutes)` para que el asistente ajuste su propio tiempo de espera.
+    - Se eliminaron las restricciones de herramientas en los prompts proactivos.
+    - El monitor ahora es inteligente: si hay un aviso de schedule pendiente, el check-in proactivo se desactiva para no ser redundante.

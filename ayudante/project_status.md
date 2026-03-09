@@ -1,4 +1,4 @@
-# Estado del Proyecto: Ayudante (v1.5)
+# Estado del Proyecto: Ayudante (v1.5.2)
 
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
@@ -37,7 +37,9 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - **Streaming & Thinking Badge**: Soporte completo para respuestas en tiempo real y estados visuales ("Consultando cerebro...", "Agendando recordatorio...", etc.).
 - **Detección de Tools en 2 Fases**: Arquitectura que separa la decisión de usar herramientas (interna) de la respuesta final al usuario (streaming), eliminando fugas de JSON técnico.
 - **Notificaciones del Navegador**: El sistema solicita permisos y lanza alertas nativas para avisos del schedule y mensajes del asistente.
-- **Sistema de Seguimiento Proactivo**: Monitor de inactividad que realiza check-ins automáticos si el usuario no reporta. Escala el intervalo de espera (5m -> 10m -> ... -> 4h) si no hay respuesta.
+- **Sistema de Seguimiento Proactivo**: Monitor de inactividad que realiza check-ins automáticos si el usuario no reporta. Escala el intervalo de espera (10m -> 20m -> ... -> 4h) si no hay respuesta.
+- **Intervalo Dinámico (Heartbeat)**: Nueva herramienta `set_checkin_interval` que permite al LLM ajustar cuánto tiempo esperar antes del siguiente check-in proactivo, permitiendo periodos de silencio más largos para tareas pesadas.
+- **Inteligencia de Schedule**: El monitor proactivo ahora se silencia si detecta que ya hay un aviso de schedule programado en el corto plazo, evitando saturar al usuario.
 - **Marcado de Tiempo (Timestamps)**: Todos los mensajes del chat incluyen ahora la hora exacta de envío.
 
 ### Archivos de código (Detalle)

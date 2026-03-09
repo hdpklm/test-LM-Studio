@@ -65,6 +65,20 @@ ayudante_tools = [
     {
         "type": "function",
         "function": {
+            "name": "set_checkin_interval",
+            "description": "Ajusta el 'heartbeat' o tiempo maximo de inactividad antes de que el asistente pregunte proactivamente. Úsalo para tareas largas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "minutes": {"type": "integer", "description": "Minutos de silencio permitidos."}
+                },
+                "required": ["minutes"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "schedule_task_checkin",
             "description": "Agenda un recordatorio en X minutos para preguntarle al usuario si ya termino una tarea.",
             "parameters": {
@@ -145,6 +159,14 @@ ayudante_tools = [
 ]
 
 from datetime import timedelta
+
+# ---- Tools de Lógica ----
+PROACTIVE_CONFIG = {"interval": 10}
+
+def set_checkin_interval_logic(minutes: int):
+    """Ajusta el tiempo de espera por inactividad (heartbeat)."""
+    PROACTIVE_CONFIG["interval"] = minutes
+    return f"Intervalo de inactividad ajustado a {minutes} minutos."
 
 def schedule_task_checkin_logic(task_desc: str, minutes: int):
     """Calcula la hora futura y asigna el checkin."""
@@ -348,6 +370,7 @@ async def agent_response(user_msg: str, websocket: WebSocket):
                 args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
                 
                 status_map = {
+                    "set_checkin_interval": "Ajustando intervalo de check-in...",
                     "schedule_task_checkin": "Agendando recordatorio...",
                     "schedule_specific_time": "Programando alarma...",
                     "save_task_duration": "Guardando progreso...",
@@ -355,14 +378,16 @@ async def agent_response(user_msg: str, websocket: WebSocket):
                 }
                 await websocket.send_json({"type": "thinking", "status": status_map.get(fn_name, f"Ejecutando {fn_name}...")})
                 
-                if fn_name == "schedule_task_checkin":
+                if fn_name == "set_checkin_interval":
+                    res = set_checkin_interval_logic(args.get("minutes", 10))
+                elif fn_name == "schedule_task_checkin":
                     res = schedule_task_checkin_logic(args.get("task", "Tarea"), args.get("minutes", 30))
                 elif fn_name == "schedule_specific_time":
                     res = schedule_specific_time_logic(args.get("task", "Alarma"), args.get("time", "12:00"))
                 elif fn_name == "save_task_duration":
                     res = save_task_duration_logic(args.get("task", "Tarea"), args.get("minutes", 30))
                 elif fn_name == "get_estimated_duration":
-                    res = res = get_estimated_duration_logic(args.get("task", "Tarea"))
+                    res = get_estimated_duration_logic(args.get("task", "Tarea"))
                 else: res = f"Tool '{fn_name}' no encontrada."
                 resultados_tools.append(f"Tool '{fn_name}' retornó: {res}")
             except Exception as e:
@@ -423,6 +448,14 @@ async def agent_response(user_msg: str, websocket: WebSocket):
     full_response = re.sub(r"\{.*\"name\".*\}", "", full_response, flags=re.DOTALL)
     full_response = full_response.strip()
 
+    # Si la respuesta quedó vacía (ej. stop tokens cortaron todo), enviar un fallback
+    if not full_response:
+        if resultados_tools:
+            full_response = "*(Acciones realizadas correctamente)*"
+        else:
+            full_response = "¡Entendido!"
+        await websocket.send_json({"type": "chat_chunk", "data": full_response})
+
     return full_response
 
 @app.websocket("/ayudante")
@@ -432,7 +465,8 @@ async def websocket_ayudante(websocket: WebSocket):
     
     # Variables de estado para el seguimiento proactivo
     last_user_interaction = datetime.now()
-    current_checkin_interval = 5 # minutos iniciales
+    # Usamos la config global para permitir que el LLM la cambie con tools
+    current_checkin_interval = PROACTIVE_CONFIG["interval"]
     
     try:
         # Tarea de fondo: verifica schedule y proactividad
@@ -460,14 +494,18 @@ async def websocket_ayudante(websocket: WebSocket):
 
                 # 2. Check de Proatividad (Seguimiento pesado)
                 minutos_inactivo = (ahora_dt - last_user_interaction).total_seconds() / 60
-                if minutos_inactivo >= current_checkin_interval:
+                
+                # Solo activamos el check-in proactivo si NO hay nada urgente en el schedule en los próximos 10 min
+                hay_proximo_aviso = any(item["status"] == "pending" for item in schedule) 
+                
+                if minutos_inactivo >= current_checkin_interval and not hay_proximo_aviso:
                     print(f"[Proactivo] Check-in iniciado tras {minutos_inactivo:.1f} min de inactividad.")
                     
                     # Generar mensaje proactivo con el LLM
                     # Pasamos un prompt especial que indica la hora y pide control
-                    proactive_prompt = f"[SISTEMA: CHECK-IN PROACTIVO - {ahora_str}]\nLlevas {int(minutos_inactivo)} minutos sin reportar. Pregunta al usuario si todo va bien con sus tareas o qué está haciendo. Sé breve y proactivo. Incluye la hora actual."
+                    proactive_prompt = f"[SISTEMA: CHECK-IN PROACTIVO - {ahora_str}]\nLlevas {int(minutos_inactivo)} minutos sin reportar. Pregunta al usuario cómo va todo. Puedes usar tus herramientas para agendar el siguiente seguimiento si lo ves necesario."
                     
-                    # Usamos agent_response pero marcando que es proactivo si fuera necesario (aquí es igual)
+                    # Usamos agent_response
                     res_proactiva = await agent_response(proactive_prompt, websocket)
                     
                     print(f"[Ayudante (Proactivo)]: {res_proactiva}")
@@ -475,10 +513,12 @@ async def websocket_ayudante(websocket: WebSocket):
                     
                     await websocket.send_json({"type": "chat_end"})
                     
-                    # Escalar intervalo: 5 -> 10 -> 20 ... -> 240 (4h)
-                    last_user_interaction = ahora_dt # Reseteamos el punto de inicio para el siguiente salto
+                    # Escalar intervalo o seguir el del LLM
+                    last_user_interaction = ahora_dt
+                    # Si el modelo usó un tool para agendar algo, respetamos eso.
+                    # Si no, escalamos el fallback.
                     current_checkin_interval = min(current_checkin_interval * 2, 240)
-                    print(f"[Proactivo] Nuevo intervalo de espera: {current_checkin_interval} min.")
+                    print(f"[Proactivo] Siguiente check-in de inactividad en {current_checkin_interval} min.")
 
                 # Check cada 30 segundos
                 await asyncio.sleep(30)
@@ -492,7 +532,7 @@ async def websocket_ayudante(websocket: WebSocket):
             
             # Reset de proactividad al recibir CUALQUIER mensaje del usuario
             last_user_interaction = datetime.now()
-            current_checkin_interval = 5
+            current_checkin_interval = PROACTIVE_CONFIG["interval"]
             
             try:
                 # Intentar parsear como JSON para comandos especiales
