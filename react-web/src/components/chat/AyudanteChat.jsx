@@ -6,8 +6,12 @@ const AyudanteChat = () => {
 	const [status, setStatus] = useState('Conectando...');
 	const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 	const [schedule, setSchedule] = useState([]);
+	const [thinkingStatus, setThinkingStatus] = useState(null);
+	const [streamingMessage, setStreamingMessage] = useState('');
 	const ws = useRef(null);
 	const messagesEndRef = useRef(null);
+	const streamingMessageRef = useRef(''); // Ref para evitar clausuras obsoletas en onmessage
+
 
 	const scrollToBottom = () => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -28,13 +32,32 @@ const AyudanteChat = () => {
 			try {
 				const payload = JSON.parse(event.data);
 				if (payload.type === 'chat_message') {
-					const data = payload.data;
-					setMessages(prev => [...prev, { role: 'assistant', content: data }]);
+					setMessages(prev => [...prev, { role: 'assistant', content: payload.data }]);
+				} else if (payload.type === 'chat_chunk') {
+					setThinkingStatus(null);
+					streamingMessageRef.current += payload.data;
+					setStreamingMessage(streamingMessageRef.current);
+				} else if (payload.type === 'chat_chunk_reset') {
+					streamingMessageRef.current = '';
+					setStreamingMessage('');
+				} else if (payload.type === 'chat_end') {
+					setThinkingStatus(null);
+					if (streamingMessageRef.current) {
+						const finalContent = streamingMessageRef.current;
+						setMessages(prev => [...prev, { role: 'assistant', content: finalContent }]);
+					}
+					streamingMessageRef.current = '';
+					setStreamingMessage('');
+				} else if (payload.type === 'thinking') {
+					setThinkingStatus(payload.status);
 				} else if (payload.type === 'schedule_update') {
 					setSchedule(payload.data);
 				} else if (payload.type === 'reset_confirmed') {
 					setMessages([]);
 					setSchedule([]);
+					streamingMessageRef.current = '';
+					setStreamingMessage('');
+					setThinkingStatus(null);
 				}
 			} catch (err) {
 				// Fallback si el server manda texto plano
@@ -107,19 +130,43 @@ const AyudanteChat = () => {
 				</div>
 
 				<div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 custom-scrollbar">
-					{messages.length === 0 ? (
+					{messages.length === 0 && !streamingMessage && !thinkingStatus ? (
 						<div className="text-center text-zinc-500 italic mt-10">Esperando indicaciones del asistente o del schedule...</div>
 					) : (
-						messages.map((msg, idx) => (
-							<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-								<div className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.role === 'user'
-									? 'bg-blue-600/50 text-blue-100 border border-blue-500/30'
-									: 'bg-zinc-800 text-zinc-300 border border-zinc-700'
-									}`}>
-									{msg.content}
+						<>
+							{messages.map((msg, idx) => (
+								<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+									<div className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.role === 'user'
+										? 'bg-blue-600/50 text-blue-100 border border-blue-500/30'
+										: 'bg-zinc-800 text-zinc-300 border border-zinc-700'
+										}`}>
+										{msg.content}
+									</div>
 								</div>
-							</div>
-						))
+							))}
+
+							{streamingMessage && (
+								<div className="flex justify-start">
+									<div className="max-w-[80%] rounded-lg px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 animate-in fade-in duration-300">
+										{streamingMessage}
+										<span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse align-middle"></span>
+									</div>
+								</div>
+							)}
+
+							{thinkingStatus && (
+								<div className="flex justify-start">
+									<div className="flex items-center gap-3 px-4 py-2 bg-zinc-900 border border-blue-500/30 rounded-full text-blue-300 text-sm animate-pulse shadow-lg shadow-blue-500/10">
+										<div className="flex gap-1">
+											<span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+											<span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+											<span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+										</div>
+										{thinkingStatus}
+									</div>
+								</div>
+							)}
+						</>
 					)}
 					<div ref={messagesEndRef} />
 				</div>

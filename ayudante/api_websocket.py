@@ -3,6 +3,7 @@ import json
 import asyncio
 from datetime import datetime
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import re
 
 app = FastAPI()
 
@@ -259,8 +260,8 @@ def extract_fallback_tool_calls(text: str):
         
     return tool_calls
 
-async def agent_response(user_msg: str):
-    """Obtiene la respuesta del Asistente Personal usando el LLM."""
+async def agent_response(user_msg: str, websocket: WebSocket):
+    """Obtiene la respuesta del Asistente Personal separando detección de tools de la respuesta final."""
     try:
         with open(OBJETIVOS_FILE, "r", encoding="utf-8") as f:
             objetivos = json.load(f)
@@ -279,10 +280,6 @@ async def agent_response(user_msg: str):
     
     sys_prompt += f"\n\n[SISTEMA - IMPORTANTE]\nFecha Actual: {fecha_hoy}\nHora Actual: {hora_actual}\n\nObjetivos Actuales del Usuario:\n{json.dumps(objetivos, indent=2, ensure_ascii=False)}"
     
-    # Leer el historial para darle contexto continuo al agente,
-    # IGNORANDO el mensaje mock antiguo para romper el loop
-    # y OBLIGANDO a que los roles se alternen (user -> assistant -> user)
-    # para evitar errores 400 Bad Request en LM Studio (strict roles)
     historial = []
     mock_text = "Asistente (Schedule Check): Tienes la meta"
     last_role = None
@@ -294,140 +291,139 @@ async def agent_response(user_msg: str):
                     entry = json.loads(line)
                     role = entry["role"]
                     content = entry["content"]
-                    
-                    if mock_text in content:
-                        continue
-                        
-                    # Filtro de roles alternos: si el rol es igual al anterior, ignoramos el mensaje viejo
-                    # o lo concatenamos. Lo más fácil para LLMs chat is ignorar el anterior o solo tomar
-                    # un historial estricto. Vamos a asegurar que nunca entren 2 roles iguales.
+                    if mock_text in content: continue
                     if role == last_role:
-                        # Reemplaza el anterior por el nuevo (última intención del usuario)
                         historial[-1] = {"role": role, "content": content}
                     else:
                         historial.append({"role": role, "content": content})
                         last_role = role
-    except Exception:
-        pass
+    except Exception: pass
         
-    # Limitar el historial a los últimos 10 mensajes para no saturar el prompt
     historial = historial[-10:]
-    
-    # Los LLMs locales requieren que el primer mensaje tras el system prompt sea del "user"
     if historial and historial[0]["role"] != "user":
         historial = historial[1:]
     
     messages = [{"role": "system", "content": sys_prompt}]
     messages.extend(historial)
 
+    # --- FASE 1: DETECCIÓN DE TOOLS (SILENCIOSA) ---
+    await websocket.send_json({"type": "thinking", "status": "Preparando herramientas..."})
+    
+    tool_calls = []
     try:
         async with httpx.AsyncClient() as client:
-            # 1ª Petición: Pasando las herramientas disponibles
-            response = await client.post(
+            resp_tools = await client.post(
+                "http://localhost:1234/v1/chat/completions",
+                json={
+                    "messages": messages + [{"role": "user", "content": "[SISTEMA: Analiza si necesitas usar herramientas para responder. Si es así, genera el JSON. NO saludes ni hables con el usuario todavía.]"}],
+                    "tools": ayudante_tools,
+                    "temperature": 0.1, # Temperatura baja para detección precisa
+                    "max_tokens": 500,
+                    "stream": False
+                },
+                timeout=60.0
+            )
+            resp_tools.raise_for_status()
+            data_tools = resp_tools.json()
+            msg_tools = data_tools["choices"][0]["message"]
+            
+            # Extraer nativas
+            if "tool_calls" in msg_tools and msg_tools["tool_calls"]:
+                tool_calls = msg_tools["tool_calls"]
+            else:
+                # Extraer fallback
+                tool_calls = extract_fallback_tool_calls(msg_tools.get("content", ""))
+    except Exception as e:
+        print(f"Tool detection error: {e}")
+
+    # --- FASE 2: EJECUCIÓN Y RESPUESTA (STREAMING) ---
+    if tool_calls:
+        # Ejecutar herramientas
+        resultados_tools = []
+        for tc in tool_calls:
+            try:
+                func_obj = tc.get("function", {})
+                fn_name = func_obj.get("name", "")
+                args_raw = func_obj.get("arguments", {})
+                args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                
+                status_map = {
+                    "schedule_task_checkin": "Agendando recordatorio...",
+                    "schedule_specific_time": "Programando alarma...",
+                    "save_task_duration": "Guardando progreso...",
+                    "get_estimated_duration": "Consultando historial de tiempos..."
+                }
+                await websocket.send_json({"type": "thinking", "status": status_map.get(fn_name, f"Ejecutando {fn_name}...")})
+                
+                if fn_name == "schedule_task_checkin":
+                    res = schedule_task_checkin_logic(args.get("task", "Tarea"), args.get("minutes", 30))
+                elif fn_name == "schedule_specific_time":
+                    res = schedule_specific_time_logic(args.get("task", "Alarma"), args.get("time", "12:00"))
+                elif fn_name == "save_task_duration":
+                    res = save_task_duration_logic(args.get("task", "Tarea"), args.get("minutes", 30))
+                elif fn_name == "get_estimated_duration":
+                    res = res = get_estimated_duration_logic(args.get("task", "Tarea"))
+                else: res = f"Tool '{fn_name}' no encontrada."
+                resultados_tools.append(f"Tool '{fn_name}' retornó: {res}")
+            except Exception as e:
+                resultados_tools.append(f"Error en tool: {str(e)}")
+
+        # Preparar mensaje con resultados
+        messages.append({
+            "role": "system",
+            "content": f"SISTEMA: Las herramientas seleccionadas se ejecutaron correctamente: {', '.join(resultados_tools)}. NO generes JSON, NO generes bloques de código. Simplemente confirma al usuario de forma amable y natural lo que has hecho."
+        })
+    else:
+        # No hubo tools, solo responder al mensaje original
+        pass
+
+    # Streaming final
+    await websocket.send_json({"type": "thinking", "status": "Redactando respuesta..."})
+    full_response = ""
+
+    async with httpx.AsyncClient() as client:
+        try:
+            async with client.stream(
+                "POST",
                 "http://localhost:1234/v1/chat/completions",
                 json={
                     "messages": messages,
-                    "tools": ayudante_tools,
-                    "temperature": 0.5,
-                    "max_tokens": 1000
+                    "temperature": 0.7,
+                    "max_tokens": 1000,
+                    "stream": True,
+                    "stop": ["```json", "{\"name\""] # Detener alucinaciones de JSON
                 },
                 timeout=120.0
-            )
-            response.raise_for_status()
-            data = response.json()
-            response_msg = data["choices"][0]["message"]
-            
-            # Obtener tool_calls nativos o por fallback (texto crudo)
-            tool_calls = []
-            if "tool_calls" in response_msg and response_msg["tool_calls"]:
-                tool_calls = response_msg["tool_calls"]
-            else:
-                content_text = response_msg.get("content", "")
-                tool_calls = extract_fallback_tool_calls(content_text)
-            
-            # Si el modelo decidió llamar a una herramienta (ej. add_alarm)
-            if tool_calls:
-                # Anexar la decisión del asistente al historial de la conversación actual
-                # Forzamos un mensaje fake de assistant con tool_calls si usamos fallback  
-                fake_msg = {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": tool_calls
-                }
-                if "tool_calls" in response_msg and response_msg["tool_calls"]:
-                    messages.append(response_msg)
-                else:
-                    messages.append(fake_msg)
-                
-                print(f"[DEBUG] Executing Tool Calls: {tool_calls}")
-                
-                resultados_tools = []
-                for tc in tool_calls:
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data: "): continue
+                    data_str = line[6:].strip()
+                    if data_str == "[DONE]": break
+                    
                     try:
-                        func_obj = tc.get("function", {})
-                        fn_name = func_obj.get("name", "")
-                        
-                        args_raw = func_obj.get("arguments", {})
-                        if isinstance(args_raw, str):
-                            args = json.loads(args_raw)
-                        else:
-                            args = args_raw
-                    except Exception as e:
-                        print(f"[DEBUG] Error parseando argumentos del tool {tc}: {e}")
-                        args = {}
-                    
-                    if fn_name == "schedule_task_checkin":
-                        task_desc = args.get("task", "Tarea")
-                        mins = args.get("minutes", 30)
-                        resultado_tool = schedule_task_checkin_logic(task_desc, mins)
-                    elif fn_name == "schedule_specific_time":
-                        task_desc = args.get("task", "Alarma")
-                        time_str = args.get("time", "12:00")
-                        resultado_tool = schedule_specific_time_logic(task_desc, time_str)
-                    elif fn_name == "save_task_duration":
-                        task_desc = args.get("task", "Tarea")
-                        mins = args.get("minutes", 30)
-                        resultado_tool = save_task_duration_logic(task_desc, mins)
-                    elif fn_name == "get_estimated_duration":
-                        task_desc = args.get("task", "Tarea")
-                        resultado_tool = get_estimated_duration_logic(task_desc)
-                    else:
-                        resultado_tool = f"Tool '{fn_name}' no encontrada."
-                        
-                    resultados_tools.append(f"Tool '{fn_name}' retornó: {resultado_tool}")
-                    
-                # Para no romper el alternado estricto (User/Assistant) de Jinja en modelos locales,
-                # enviamos los resultados de todas las herramientas agrupados en un solo mensaje del "user".
-                texto_resultados = "\n".join(resultados_tools)
-                messages.append({
-                    "role": "user",
-                    "content": f"[SYSTEM: Resultado de las herramientas ejecutadas internamente:\n{texto_resultados}]\nBasado en esto, finaliza tu respuesta al usuario."
-                })
-                
-                # 2ª Petición: Que el LLM lea el resultado de la herramienta y devuelva el texto final
-                response_final = await client.post(
-                    "http://localhost:1234/v1/chat/completions",
-                    json={
-                        "messages": messages,
-                        "temperature": 0.5,
-                        "max_tokens": 1000
-                    },
-                    timeout=120.0
-                )
-                response_final.raise_for_status()
-                data_final = response_final.json()
-                return data_final["choices"][0]["message"]["content"]
-                
-            else:
-                # Retorna texto normal sin usar tools
-                return response_msg.get("content", "")
+                        chunk = json.loads(data_str)
+                        delta = chunk["choices"][0].get("delta", {})
+                        if "content" in delta and delta["content"]:
+                            content_piece = delta["content"]
+                            
+                            # Filtro extra por si acaso el stop-token falla o es parcial
+                            if "```json" in full_response + content_piece:
+                                continue
+                                
+                            full_response += content_piece
+                            await websocket.send_json({"type": "chat_chunk", "data": content_piece})
+                    except: continue
+        except Exception as e:
+            full_response = f"*(Error de conexión: {str(e)})*"
+            await websocket.send_json({"type": "chat_chunk", "data": full_response})
 
-    except httpx.HTTPStatusError as exc:
-        err_msg = exc.response.text
-        print(f"[LLM Error Detalle]: {err_msg}")
-        return f"*(Error de conexión con el LLM local en el puerto 1234: HTTPStatusError {exc.response.status_code}. Detalle: {err_msg})*"
-    except Exception as e:
-        return f"*(Error de conexión con el LLM local en el puerto 1234: {str(e)}. Asegúrate de que LM Studio o el servidor OpenAI-compatible esté corriendo)*"
+    # Limpieza final post-procesada para el historial
+    full_response = re.sub(r"```json.*?```", "", full_response, flags=re.DOTALL)
+    full_response = re.sub(r"\{.*\"name\".*\}", "", full_response, flags=re.DOTALL)
+    full_response = full_response.strip()
+
+    return full_response
 
 @app.websocket("/ayudante")
 async def websocket_ayudante(websocket: WebSocket):
@@ -502,16 +498,15 @@ async def websocket_ayudante(websocket: WebSocket):
             print(f"[Usuario]: {data}")
             append_to_history("user", data)
             
-            # 2. Genera respuesta bruta del LLM
-            respuesta_limpia = await agent_response(data)
+            # 2. Genera respuesta bruta del LLM con STREAM y STATUS
+            respuesta_limpia = await agent_response(data, websocket)
             
             print(f"[Ayudante]: {respuesta_limpia}")
             append_to_history("assistant", respuesta_limpia)
             
-            # Envía iteración al frontend
+            # Notificar fin de chat para que el frontend guarde el mensaje final
             await websocket.send_json({
-                "type": "chat_message",
-                "data": respuesta_limpia
+                "type": "chat_end"
             })
             
             # Actualiza el schedule lateral de UI por si hay nuevas alarmas creadas

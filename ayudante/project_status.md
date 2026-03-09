@@ -1,4 +1,4 @@
-# Estado del Proyecto: Ayudante (v1.2)
+# Estado del Proyecto: Ayudante (v1.3)
 
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
@@ -34,7 +34,12 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - `get_estimated_duration`: Consulta el promedio de tiempo que toma completar la tarea.
 - `extract_fallback_tool_calls`: Parseador extra regex que intercepta las alucinaciones JSON y Diccionarios Planos generados por el LLM en texto local.
 - **Reset Functionality**: El servidor permite limpiar el historial y el schedule mediante un comando JSON tipo `reset`.
+- **Streaming & Thinking Badge**: Soporte completo para respuestas en tiempo real y estados visuales ("Consultando cerebro...", "Agendando recordatorio...", etc.).
 
 ### Archivos de código (Detalle)
 - **`api_websocket.py`**:
+    - `thinking`: Mensaje con el estado actual del asistente.
+    - `chat_chunk`: Fragmento de streaming del LLM.
+    - `chat_chunk_reset`: Limpia el acumulador del frontend antes de respuestas finales.
+    - `chat_end`: Cierre de stream y guardado final.
     - `reset_confirmed`: Mensaje enviado al frontend tras limpiar archivos.
