@@ -12,6 +12,18 @@ const AyudanteChat = () => {
 	const messagesEndRef = useRef(null);
 	const streamingMessageRef = useRef(''); // Ref para evitar clausuras obsoletas en onmessage
 
+	useEffect(() => {
+		if ("Notification" in window && Notification.permission === "default") {
+			Notification.requestPermission();
+		}
+	}, []);
+
+	const showNotification = (title, body) => {
+		if ("Notification" in window && Notification.permission === "granted") {
+			new Notification(title, { body, icon: "/logo192.png" });
+		}
+	};
+
 
 	const scrollToBottom = () => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -33,6 +45,7 @@ const AyudanteChat = () => {
 				const payload = JSON.parse(event.data);
 				if (payload.type === 'chat_message') {
 					setMessages(prev => [...prev, { role: 'assistant', content: payload.data }]);
+					showNotification("🤖 Asistente", payload.data);
 				} else if (payload.type === 'chat_chunk') {
 					setThinkingStatus(null);
 					streamingMessageRef.current += payload.data;
@@ -45,6 +58,7 @@ const AyudanteChat = () => {
 					if (streamingMessageRef.current) {
 						const finalContent = streamingMessageRef.current;
 						setMessages(prev => [...prev, { role: 'assistant', content: finalContent }]);
+						showNotification("🤖 Asistente", finalContent);
 					}
 					streamingMessageRef.current = '';
 					setStreamingMessage('');

@@ -1,4 +1,4 @@
-# Estado del Proyecto: Ayudante (v1.3)
+# Estado del Proyecto: Ayudante (v1.4)
 
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
@@ -35,11 +35,14 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - `extract_fallback_tool_calls`: Parseador extra regex que intercepta las alucinaciones JSON y Diccionarios Planos generados por el LLM en texto local.
 - **Reset Functionality**: El servidor permite limpiar el historial y el schedule mediante un comando JSON tipo `reset`.
 - **Streaming & Thinking Badge**: Soporte completo para respuestas en tiempo real y estados visuales ("Consultando cerebro...", "Agendando recordatorio...", etc.).
+- **Detección de Tools en 2 Fases**: Arquitectura que separa la decisión de usar herramientas (interna) de la respuesta final al usuario (streaming), eliminando fugas de JSON técnico.
+- **Notificaciones del Navegador**: El sistema solicita permisos y lanza alertas nativas para avisos del schedule y mensajes del asistente.
 
 ### Archivos de código (Detalle)
 - **`api_websocket.py`**:
+    - `agent_response`: Refactorizado a 2 fases (Detección silenciosa -> Respuesta final con streaming filtrado).
     - `thinking`: Mensaje con el estado actual del asistente.
-    - `chat_chunk`: Fragmento de streaming del LLM.
-    - `chat_chunk_reset`: Limpia el acumulador del frontend antes de respuestas finales.
-    - `chat_end`: Cierre de stream y guardado final.
-    - `reset_confirmed`: Mensaje enviado al frontend tras limpiar archivos.
+    - `chat_chunk`: Fragmento de streaming del LLM (ahora con filtrado anti-JSON).
+- **`AyudanteChat.jsx`**:
+    - `showNotification`: Utilidad para lanzar notificaciones del sistema en mensajes y alertas de schedule.
+    - `onmessage`: Maneja el flujo de streaming, badges y notificaciones.

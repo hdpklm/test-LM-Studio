@@ -27,4 +27,7 @@
     - Se añadieron `stop tokens` (` ```json ` y ` {"name" `) a la petición de Phase 2 para cortar la alucinación antes de que empiece.
     - Se implementó un filtro de chunks en tiempo real para descartar cualquier texto que contenga fragmentos de código JSON si el stop token falla.
     - Se refinó el prompt de Phase 2 para ser extremadamente estricto y humano.
-
+### 📝 Registro: [v1.4.0] - Restauración de Notificaciones del Navegador
+- **Problema**: Las notificaciones del sistema se habían desactivado inadvertidamente en la v1.2, impidiendo que el usuario viera los avisos del schedule fuera del chat.
+- **Causa**: Error de interpretación sobre el alcance de la limpieza de "alerts".
+- **Solución**: Se re-implementó la lógica de `Notification` en el frontend, añadiendo solicitud de permisos al cargar y disparadores automáticos en la recepción de mensajes del asistente y alertas de schedule.
