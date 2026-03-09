@@ -9,3 +9,8 @@
 - **Problema**: El servidor de WebSockets en `api_websocket.py` arrojaba advertencias por falta de librería de soporte (`websockets`). Además, se utilizaban `pydantic` y `httpx` sin estar explícitamente en el `requirements.txt`.
 - **Causa**: Omisión durante la implementación del ecosistema del Ayudante.
 - **Solución**: Se añadieron las dependencias al `requirements.txt` de la raíz (compartido) y se actualizó la documentación del Ayudante.
+
+### 📝 Registro: [v1.2] - Implementación de Botón Reset y Limpieza de Alertas
+- **Problema**: El chat no podía reiniciarse sin borrar manualmente los archivos. Además, las notificaciones del navegador y los prefijos de sistema eran molestos.
+- **Causa**: Falta de funcionalidad de gestión de estado de sesión.
+- **Solución**: Se añadió un botón "Reset" en el frontend que envía un comando al backend para truncar `historial_global.jsonl` y vaciar `schedule.json`. Se eliminaron las notificaciones `Notification` de React y los prefijos de alerta del sistema en los mensajes automáticos.

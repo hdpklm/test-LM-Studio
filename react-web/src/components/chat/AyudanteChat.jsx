@@ -29,18 +29,12 @@ const AyudanteChat = () => {
 				const payload = JSON.parse(event.data);
 				if (payload.type === 'chat_message') {
 					const data = payload.data;
-					if (Notification.permission === "granted") {
-						new Notification("Ayudante Personal", { body: data });
-					} else if (Notification.permission !== "denied") {
-						Notification.requestPermission().then(permission => {
-							if (permission === "granted") {
-								new Notification("Ayudante Personal", { body: data });
-							}
-						});
-					}
 					setMessages(prev => [...prev, { role: 'assistant', content: data }]);
 				} else if (payload.type === 'schedule_update') {
 					setSchedule(payload.data);
+				} else if (payload.type === 'reset_confirmed') {
+					setMessages([]);
+					setSchedule([]);
 				}
 			} catch (err) {
 				// Fallback si el server manda texto plano
@@ -63,6 +57,12 @@ const AyudanteChat = () => {
 			}
 		};
 	}, []);
+
+	const handleReset = () => {
+		if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+			ws.current.send(JSON.stringify({ type: 'reset' }));
+		}
+	};
 
 	const sendMessage = (e) => {
 		e.preventDefault();
@@ -88,6 +88,14 @@ const AyudanteChat = () => {
 						<span className={`text-sm px-2 py-1 rounded ${status === 'Conectado' ? 'bg-emerald-900 text-emerald-300' : 'bg-rose-900 text-rose-300'}`}>
 							{status}
 						</span>
+						<button
+							onClick={handleReset}
+							className="p-2 bg-rose-900/50 hover:bg-rose-900 rounded-lg text-rose-100 transition-colors flex items-center gap-2 border border-rose-500/30"
+							title="Reiniciar chat y schedule"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+							Reset
+						</button>
 						<button
 							onClick={() => setIsDrawerOpen(!isDrawerOpen)}
 							className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-zinc-300 transition-colors flex items-center gap-2"

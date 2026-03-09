@@ -454,7 +454,7 @@ async def websocket_ayudante(websocket: WebSocket):
                         actualizado = True
                         
                         # Avisar al usuario por el chat
-                        alerta = f"¡Alarma / Recordatorio!: Es hora de '{item['task']}'."
+                        alerta = f"Es hora de: {item['task']}"
                         append_to_history("assistant", alerta)
                         await websocket.send_json({
                             "type": "chat_message",
@@ -477,8 +477,28 @@ async def websocket_ayudante(websocket: WebSocket):
         bg_task = asyncio.create_task(check_schedule_loop())
 
         while True:
-            # 1. Espera respuesta del frontend (usuario)
-            data = await websocket.receive_text()
+            # 1. Espera respuesta del frontend
+            raw_data = await websocket.receive_text()
+            try:
+                # Intentar parsear como JSON para comandos especiales (ej. reset)
+                payload = json.loads(raw_data)
+                if payload.get("type") == "reset":
+                    print("[WebSocket] Solicitud de RESET recibida.")
+                    # 1. Truncar historial
+                    with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
+                        f.write("")
+                    # 2. Resetear schedule
+                    save_schedule([])
+                    # 3. Notificar éxito
+                    await websocket.send_json({"type": "reset_confirmed"})
+                    continue
+                else:
+                    # Si es JSON pero no es reset, lo tratamos como texto normal por ahora
+                    data = raw_data
+            except json.JSONDecodeError:
+                # Es un mensaje de texto normal
+                data = raw_data
+
             print(f"[Usuario]: {data}")
             append_to_history("user", data)
             
