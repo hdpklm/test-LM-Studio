@@ -7,3 +7,6 @@ nest-asyncio
 fastapi
 uvicorn
 python-multipart
+pydantic
+httpx
+websockets

@@ -1,7 +1,12 @@
-# Estado del Proyecto: Ayudante (v1.0)
+# Estado del Proyecto: Ayudante (v1.1)
 
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
+
+## Dependencias (requirements.txt)
+- **`pydantic`**: Gestión de modelos de datos (utilizado en validación).
+- **`httpx`**: Cliente HTTP asíncrono para comunicaciones con el LLM local.
+- **`websockets`**: Librería de soporte para el servidor WebSocket de `uvicorn`.
 
 ## Arquitectura
 

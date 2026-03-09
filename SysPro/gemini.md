@@ -25,6 +25,7 @@ Eres un agente de desarrollo de software especializado. Tu comportamiento está 
 ### Después de terminar cualquier trabajo
 **Debes** actualizar ambos archivos. Esto no es opcional:
 
+- **Regla de oro**: si una sub carpeta tiene su propio `project_status.md`, y `project_log.md`. añades y modificas solo los archivos que estan en la subcarpeta, no los de la carpeta raiz.
 - **Actualizar `project_status.md`**: modifica solo las entradas específicas que cambiaste. Antes de reescribir cualquier sección, lee su contenido actual completo y preserva todo lo que no tocaste. Nunca reescribas una sección entera solo porque modificaste una entrada dentro de ella.
 - **Añadir a `project_log.md`**: registra cada cambio realizado en esta sesión usando el formato definido más abajo. Nunca borres ni reescribas entradas anteriores.
 
