@@ -360,6 +360,8 @@ async def agent_response(user_msg: str):
                     messages.append(fake_msg)
                 
                 print(f"[DEBUG] Executing Tool Calls: {tool_calls}")
+                
+                resultados_tools = []
                 for tc in tool_calls:
                     try:
                         func_obj = tc.get("function", {})
@@ -392,12 +394,15 @@ async def agent_response(user_msg: str):
                     else:
                         resultado_tool = f"Tool '{fn_name}' no encontrada."
                         
-                    # Para no romper el alternado estricto (User/Assistant) de Jinja en modelos locales,
-                    # enviamos el resultado de la herramienta como si fuera un nuevo mensaje del "user".
-                    messages.append({
-                        "role": "user",
-                        "content": f"[System: La ejecución de la herramienta '{fn_name}' devolvió este resultado interno: {resultado_tool}]\nBasado en esto, finaliza tu respuesta."
-                    })
+                    resultados_tools.append(f"Tool '{fn_name}' retornó: {resultado_tool}")
+                    
+                # Para no romper el alternado estricto (User/Assistant) de Jinja en modelos locales,
+                # enviamos los resultados de todas las herramientas agrupados en un solo mensaje del "user".
+                texto_resultados = "\n".join(resultados_tools)
+                messages.append({
+                    "role": "user",
+                    "content": f"[SYSTEM: Resultado de las herramientas ejecutadas internamente:\n{texto_resultados}]\nBasado en esto, finaliza tu respuesta al usuario."
+                })
                 
                 # 2ª Petición: Que el LLM lea el resultado de la herramienta y devuelva el texto final
                 response_final = await client.post(

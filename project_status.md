@@ -55,12 +55,8 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 
 ### Sección de directorios
 - **`test-LM-Studio/ayudante/`**
-	- **Propósito**: Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
-	- **`api_websocket.py`**: API en WebSocket que se encarga del servidor de notificaciones/chat.
-	- **`asistente_personal.md`**: Agente conversacional y gestionador de tiempo/rutinas.
-	- **`monitor_asistente.md`**: Agente metacognitivo que analiza y actualiza el prompt del asistente de acuerdo al historial global.
-	- **`decisiones_monitor.md`**: Rastreador de fallos y éxitos utilizados por el Monitor para evitar repeticiones.
-	- **`objetivos.json`**: Metas y rutinas dadas por el usuario.
+	- **Propósito**: Ecosistema interactivo de asistencia personal regido por objetivos.
+	- **NOTA DE ARQUITECTURA**: La versión, los logs (`project_log.md`) y el estado con la lista técnica de todos los archivos y funciones del ayudante (`project_status.md`) están desacoplados y viven de forma independiente dentro de su propia subcarpeta `ayudante/`. Por favor lee esos archivos si modificas el ayudante.
 - **`test-LM-Studio/PlanesDeTranajo/`**
 	- **Propósito**: Esta carpeta es para almacenar roles que tiene que ejecutar el agente. En ella residirá una descripción del agente en cada archivo, pero sin contener código. Su función es servir de espacio para anotar todas las ideas del usuario e irlas implementando poco a poco en el comportamiento de los agentes.
 	- **`agente_viajes.md`**: Plan de diseño y conceptualización del Agente de Viajes Completo.
