@@ -1,13 +1,17 @@
 import React from 'react';
 import { useChat } from '../../context/ChatContext';
-import { MessageSquare, FolderClock, Menu, Zap, Bot, Workflow } from 'lucide-react';
+import { MessageSquare, FolderClock, Menu, Zap, Bot, Workflow, Clock } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const LeftDrawer = () => {
 	const { leftDrawerOpen, toggleLeftDrawer, historyList, setCurrentChatId, currentChatId, chatMode, setChatMode } = useChat();
+	const navigate = useNavigate();
+	const location = useLocation();
 
 	const handleModeSelect = (mode) => {
 		setChatMode(mode);
 		setCurrentChatId(null);
+		navigate('/');
 	};
 
 	return (
@@ -17,12 +21,20 @@ const LeftDrawer = () => {
 		>
 			<div className="p-3 border-b border-zinc-800/50 space-y-1">
 				<div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2 px-2">Agentes</div>
-				
+
+				<button
+					onClick={() => navigate('/ayudante')}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${location.pathname === '/ayudante' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+						}`}
+				>
+					<Clock className="w-4 h-4 shrink-0" />
+					<span>Ayudante</span>
+				</button>
+
 				<button
 					onClick={() => handleModeSelect('free')}
-					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-						chatMode === 'free' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-					}`}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${location.pathname !== '/ayudante' && chatMode === 'free' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+						}`}
 				>
 					<Zap className="w-4 h-4 shrink-0" />
 					<span>Free Chat</span>
@@ -30,9 +42,8 @@ const LeftDrawer = () => {
 
 				<button
 					onClick={() => handleModeSelect('syspro')}
-					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-						chatMode === 'syspro' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-					}`}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${location.pathname !== '/ayudante' && chatMode === 'syspro' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+						}`}
 				>
 					<Bot className="w-4 h-4 shrink-0" />
 					<span>SysPro-Gen</span>
@@ -40,9 +51,8 @@ const LeftDrawer = () => {
 
 				<button
 					onClick={() => handleModeSelect('longloop')}
-					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
-						chatMode === 'longloop' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
-					}`}
+					className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${location.pathname !== '/ayudante' && chatMode === 'longloop' ? 'bg-zinc-800 text-[#f4ba3e] font-medium' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+						}`}
 				>
 					<Workflow className="w-4 h-4 shrink-0" />
 					<span>LongLoop-Agent</span>
@@ -65,8 +75,8 @@ const LeftDrawer = () => {
 							key={item.id}
 							onClick={() => setCurrentChatId(item.id)}
 							className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left ${currentChatId === item.id
-									? 'bg-zinc-800 text-zinc-100'
-									: 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
+								? 'bg-zinc-800 text-zinc-100'
+								: 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200'
 								}`}
 						>
 							<MessageSquare className="w-4 h-4 shrink-0" />
