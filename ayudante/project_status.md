@@ -1,4 +1,4 @@
-# Estado del Proyecto: Ayudante (v1.4)
+# Estado del Proyecto: Ayudante (v1.5)
 
 ## Propósito
 Ecosistema interactivo de asistencia personal regido por los objetivos (`objetivos.json`) del usuario. Contiene el servidor en tiempo real (`api_websocket.py`) y promueve auto-mejora por medio del Monitor y su memoria.
@@ -37,12 +37,13 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - **Streaming & Thinking Badge**: Soporte completo para respuestas en tiempo real y estados visuales ("Consultando cerebro...", "Agendando recordatorio...", etc.).
 - **Detección de Tools en 2 Fases**: Arquitectura que separa la decisión de usar herramientas (interna) de la respuesta final al usuario (streaming), eliminando fugas de JSON técnico.
 - **Notificaciones del Navegador**: El sistema solicita permisos y lanza alertas nativas para avisos del schedule y mensajes del asistente.
+- **Sistema de Seguimiento Proactivo**: Monitor de inactividad que realiza check-ins automáticos si el usuario no reporta. Escala el intervalo de espera (5m -> 10m -> ... -> 4h) si no hay respuesta.
+- **Marcado de Tiempo (Timestamps)**: Todos los mensajes del chat incluyen ahora la hora exacta de envío.
 
 ### Archivos de código (Detalle)
 - **`api_websocket.py`**:
-    - `agent_response`: Refactorizado a 2 fases (Detección silenciosa -> Respuesta final con streaming filtrado).
-    - `thinking`: Mensaje con el estado actual del asistente.
-    - `chat_chunk`: Fragmento de streaming del LLM (ahora con filtrado anti-JSON).
+    - `background_monitor_loop`: Gestiona tanto las alertas del schedule como el seguimiento proactivo con escalabilidad.
+    - `agent_response`: Utilizado para generar mensajes de check-in automáticos con contexto temporal.
 - **`AyudanteChat.jsx`**:
     - `showNotification`: Utilidad para lanzar notificaciones del sistema en mensajes y alertas de schedule.
-    - `onmessage`: Maneja el flujo de streaming, badges y notificaciones.
+    - Renderización de `messages`: Incluye ahora visualización de `time` y layouts ajustados para timestamps.

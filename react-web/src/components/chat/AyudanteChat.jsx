@@ -44,7 +44,7 @@ const AyudanteChat = () => {
 			try {
 				const payload = JSON.parse(event.data);
 				if (payload.type === 'chat_message') {
-					setMessages(prev => [...prev, { role: 'assistant', content: payload.data }]);
+					setMessages(prev => [...prev, { role: 'assistant', content: payload.data, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
 					showNotification("🤖 Asistente", payload.data);
 				} else if (payload.type === 'chat_chunk') {
 					setThinkingStatus(null);
@@ -57,7 +57,11 @@ const AyudanteChat = () => {
 					setThinkingStatus(null);
 					if (streamingMessageRef.current) {
 						const finalContent = streamingMessageRef.current;
-						setMessages(prev => [...prev, { role: 'assistant', content: finalContent }]);
+						setMessages(prev => [...prev, {
+							role: 'assistant',
+							content: finalContent,
+							time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+						}]);
 						showNotification("🤖 Asistente", finalContent);
 					}
 					streamingMessageRef.current = '';
@@ -105,7 +109,11 @@ const AyudanteChat = () => {
 		e.preventDefault();
 		if (input.trim() && ws.current && ws.current.readyState === WebSocket.OPEN) {
 			ws.current.send(input);
-			setMessages(prev => [...prev, { role: 'user', content: input }]);
+			setMessages(prev => [...prev, {
+				role: 'user',
+				content: input,
+				time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+			}]);
 			setInput('');
 		}
 	};
@@ -149,13 +157,16 @@ const AyudanteChat = () => {
 					) : (
 						<>
 							{messages.map((msg, idx) => (
-								<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+								<div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-1`}>
 									<div className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.role === 'user'
 										? 'bg-blue-600/50 text-blue-100 border border-blue-500/30'
 										: 'bg-zinc-800 text-zinc-300 border border-zinc-700'
 										}`}>
 										{msg.content}
 									</div>
+									<span className="text-[10px] text-zinc-500 px-1 opacity-60">
+										{msg.time}
+									</span>
 								</div>
 							))}
 

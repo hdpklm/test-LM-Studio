@@ -430,92 +430,101 @@ async def websocket_ayudante(websocket: WebSocket):
     await websocket.accept()
     print("[WebSocket] Cliente conectado a /ayudante.")
     
-    # Enviar estado inicial del schedule
-    await websocket.send_json({
-        "type": "schedule_update",
-        "data": get_current_schedule()
-    })
+    # Variables de estado para el seguimiento proactivo
+    last_user_interaction = datetime.now()
+    current_checkin_interval = 5 # minutos iniciales
     
     try:
-        # Tarea de fondo: verifica cada minuto la hora actual contra el schedule
-        async def check_schedule_loop():
+        # Tarea de fondo: verifica schedule y proactividad
+        async def background_monitor_loop():
+            nonlocal last_user_interaction, current_checkin_interval
             while True:
-                ahora = datetime.now().strftime("%H:%M")
+                ahora_dt = datetime.now()
+                ahora_str = ahora_dt.strftime("%H:%M")
+                
+                # 1. Check de Schedule (Alertas pasivas)
                 schedule = get_current_schedule()
                 actualizado = False
-                
                 for item in schedule:
-                    if item["status"] == "pending" and item["time"] == ahora:
+                    if item["status"] == "pending" and item["time"] == ahora_str:
                         item["status"] = "done"
                         actualizado = True
-                        
-                        # Avisar al usuario por el chat
-                        alerta = f"Es hora de: {item['task']}"
+                        alerta = f"[{ahora_str}] Es hora de: {item['task']}"
                         append_to_history("assistant", alerta)
-                        await websocket.send_json({
-                            "type": "chat_message",
-                            "data": alerta
-                        })
+                        await websocket.send_json({"type": "chat_message", "data": alerta})
                 
                 if actualizado:
                     save_schedule(schedule)
-                    await websocket.send_json({
-                        "type": "schedule_update",
-                        "data": schedule
-                    })
-                    # Despertar al Monitor!
+                    await websocket.send_json({"type": "schedule_update", "data": schedule})
                     asyncio.create_task(trigger_monitor())
-                
+
+                # 2. Check de Proatividad (Seguimiento pesado)
+                minutos_inactivo = (ahora_dt - last_user_interaction).total_seconds() / 60
+                if minutos_inactivo >= current_checkin_interval:
+                    print(f"[Proactivo] Check-in iniciado tras {minutos_inactivo:.1f} min de inactividad.")
+                    
+                    # Generar mensaje proactivo con el LLM
+                    # Pasamos un prompt especial que indica la hora y pide control
+                    proactive_prompt = f"[SISTEMA: CHECK-IN PROACTIVO - {ahora_str}]\nLlevas {int(minutos_inactivo)} minutos sin reportar. Pregunta al usuario si todo va bien con sus tareas o qué está haciendo. Sé breve y proactivo. Incluye la hora actual."
+                    
+                    # Usamos agent_response pero marcando que es proactivo si fuera necesario (aquí es igual)
+                    res_proactiva = await agent_response(proactive_prompt, websocket)
+                    
+                    print(f"[Ayudante (Proactivo)]: {res_proactiva}")
+                    append_to_history("assistant", res_proactiva)
+                    
+                    await websocket.send_json({"type": "chat_end"})
+                    
+                    # Escalar intervalo: 5 -> 10 -> 20 ... -> 240 (4h)
+                    last_user_interaction = ahora_dt # Reseteamos el punto de inicio para el siguiente salto
+                    current_checkin_interval = min(current_checkin_interval * 2, 240)
+                    print(f"[Proactivo] Nuevo intervalo de espera: {current_checkin_interval} min.")
+
                 # Check cada 30 segundos
                 await asyncio.sleep(30)
                 
-        # Iniciar loop del reloj acoplado a la conexión
-        bg_task = asyncio.create_task(check_schedule_loop())
+        # Iniciar loop del monitor acoplado a la conexión
+        bg_task = asyncio.create_task(background_monitor_loop())
 
         while True:
             # 1. Espera respuesta del frontend
             raw_data = await websocket.receive_text()
+            
+            # Reset de proactividad al recibir CUALQUIER mensaje del usuario
+            last_user_interaction = datetime.now()
+            current_checkin_interval = 5
+            
             try:
-                # Intentar parsear como JSON para comandos especiales (ej. reset)
+                # Intentar parsear como JSON para comandos especiales
                 payload = json.loads(raw_data)
                 if payload.get("type") == "reset":
                     print("[WebSocket] Solicitud de RESET recibida.")
-                    # 1. Truncar historial
                     with open(HISTORIAL_FILE, "w", encoding="utf-8") as f:
                         f.write("")
-                    # 2. Resetear schedule
                     save_schedule([])
-                    # 3. Notificar éxito
                     await websocket.send_json({"type": "reset_confirmed"})
                     continue
                 else:
-                    # Si es JSON pero no es reset, lo tratamos como texto normal por ahora
                     data = raw_data
             except json.JSONDecodeError:
-                # Es un mensaje de texto normal
                 data = raw_data
 
             print(f"[Usuario]: {data}")
             append_to_history("user", data)
             
-            # 2. Genera respuesta bruta del LLM con STREAM y STATUS
+            # 2. Genera respuesta
             respuesta_limpia = await agent_response(data, websocket)
             
             print(f"[Ayudante]: {respuesta_limpia}")
             append_to_history("assistant", respuesta_limpia)
             
-            # Notificar fin de chat para que el frontend guarde el mensaje final
-            await websocket.send_json({
-                "type": "chat_end"
-            })
+            await websocket.send_json({"type": "chat_end"})
             
-            # Actualiza el schedule lateral de UI por si hay nuevas alarmas creadas
             await websocket.send_json({
                 "type": "schedule_update",
                 "data": get_current_schedule()
             })
             
-            # 4. Despierta al Monitor Asistente
             asyncio.create_task(trigger_monitor())
 
     except WebSocketDisconnect:

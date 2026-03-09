@@ -31,3 +31,12 @@
 - **Problema**: Las notificaciones del sistema se habían desactivado inadvertidamente en la v1.2, impidiendo que el usuario viera los avisos del schedule fuera del chat.
 - **Causa**: Error de interpretación sobre el alcance de la limpieza de "alerts".
 - **Solución**: Se re-implementó la lógica de `Notification` en el frontend, añadiendo solicitud de permisos al cargar y disparadores automáticos en la recepción de mensajes del asistente y alertas de schedule.
+
+### 📝 Registro: [v1.5.0] - Implementación de Seguimiento Proactivo y Timestamps
+- **Problema**: El asistente era puramente reactivo y dependía de la iniciativa del usuario o del schedule rígido. Se necesitaba un control más dinámico sobre el estado del usuario.
+- **Causa**: Limitación en el diseño inicial del loop de eventos del WebSocket.
+- **Solución**: 
+    - Se creó `background_monitor_loop` en el backend para vigilar la última interacción del usuario.
+    - Lógica de escalado: El asistente pregunta cada 5m, 10m, 20m... hasta 4h si el usuario no responde.
+    - Se añadieron Timestamps visibles en el frontend para cumplir con el requisito de control horario exacto.
+
