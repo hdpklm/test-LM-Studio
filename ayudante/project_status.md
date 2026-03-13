@@ -23,13 +23,13 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 
 ### Archivos
 - **`api_websocket.py`**: API en WebSocket que se encarga del servidor de notificaciones/chat y ejecuta las Herramientas (Tools).
-- **`asistente_personal.md`**: Agente conversacional y gestionador de tiempo/rutinas. Llama a tools con JSON plano bloqueado.
-- **`monitor_asistente.md`**: Agente metacognitivo que analiza y actualiza el prompt del asistente de acuerdo al historial global.
-- **`decisiones_monitor.md`**: Rastreador de fallos y éxitos utilizados por el Monitor para evitar repeticiones.
-- **`objetivos.json`**: Metas y rutinas dadas por el usuario.
-- **`schedule.json`**: Temporizadores y alarmas activas (`schedule_task_checkin`, `schedule_specific_time`).
-- **`task_durations.json`**: Tiempos históricos guardados de las tareas (`save_task_duration`, `get_estimated_duration`).
-- **`historial_global.jsonl`**: Historial de chat en formato JSON Lines. Alternado estricto `user`/`assistant`.
+- **`sys-prompt/asistente_personal.md`**: Agente conversacional y gestionador de tiempo/rutinas. Llama a tools con JSON plano bloqueado.
+- **`sys-prompt/monitor_asistente.md`**: Agente metacognitivo que analiza y actualiza el prompt del asistente de acuerdo al historial global.
+- **`sys-prompt/decisiones_monitor.md`**: Rastreador de fallos y éxitos utilizados por el Monitor para evitar repeticiones.
+- **`user-data/objetivos.json`**: Metas y rutinas dadas por el usuario.
+- **`user-data/schedule.json`**: Temporizadores y alarmas activas (`schedule_task_checkin`, `schedule_specific_time`).
+- **`user-data/task_durations.json`**: Tiempos históricos guardados de las tareas (`save_task_duration`, `get_estimated_duration`).
+- **`user-data/historial_global.json`**: Historial de chat en formato JSON Lines. Alternado estricto `user`/`assistant`.
 
 ### Funciones Principales (Herramientas) en `api_websocket.py`
 - `schedule_task_checkin`: Agenda timer relativo.

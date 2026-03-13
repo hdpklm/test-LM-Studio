@@ -13,7 +13,7 @@
 ### 📝 Registro: [v1.2] - Implementación de Botón Reset y Limpieza de Alertas
 - **Problema**: El chat no podía reiniciarse sin borrar manualmente los archivos. Además, las notificaciones del navegador y los prefijos de sistema eran molestos.
 - **Causa**: Falta de funcionalidad de gestión de estado de sesión.
-- **Solución**: Se añadió un botón "Reset" en el frontend que envía un comando al backend para truncar `historial_global.jsonl` y vaciar `schedule.json`. Se eliminaron las notificaciones `Notification` de React y los prefijos de alerta del sistema en los mensajes automáticos.
+- **Solución**: Se añadió un botón "Reset" en el frontend que envía un comando al backend para truncar `historial_global.json` y vaciar `schedule.json`. Se eliminaron las notificaciones `Notification` de React y los prefijos de alerta del sistema en los mensajes automáticos.
 
 ### 📝 Registro: [v1.3] - Streaming de Respuestas y Badge de Estado (Thinking)
 - **Problema**: Las respuestas del asistente tardaban demasiado en aparecer (bloqueo por procesamiento completo) y el usuario no sabía qué estaba haciendo el servidor (si pensaba o ejecutaba herramientas).

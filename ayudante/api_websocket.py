@@ -9,11 +9,14 @@ app = FastAPI()
 
 # Rutas a archivos clave
 AYUDANTE_DIR = os.path.dirname(os.path.abspath(__file__))
-HISTORIAL_FILE = os.path.join(AYUDANTE_DIR, "historial_global.jsonl")
-OBJETIVOS_FILE = os.path.join(AYUDANTE_DIR, "objetivos.json")
+USER_DATA_DIR = os.path.join(AYUDANTE_DIR, "user-data")
+SYS_PROMPT_DIR = os.path.join(AYUDANTE_DIR, "sys-prompt")
+
+HISTORIAL_FILE = os.path.join(USER_DATA_DIR, "historial_global.json")
+OBJETIVOS_FILE = os.path.join(USER_DATA_DIR, "objetivos.json")
 
 def append_to_history(role: str, content: str):
-    """Guarda en historial_global.jsonl la interacción inmutable."""
+    """Guarda en historial_global.json la interacción inmutable."""
     entry = {
         "timestamp": datetime.now().isoformat(),
         "role": role,
@@ -32,7 +35,7 @@ async def trigger_monitor():
 import httpx
 import uuid
 
-SCHEDULE_FILE = os.path.join(AYUDANTE_DIR, "schedule.json")
+SCHEDULE_FILE = os.path.join(USER_DATA_DIR, "schedule.json")
 
 def get_current_schedule():
     """Carga el schedule real desde schedule.json"""
@@ -47,7 +50,7 @@ def save_schedule(schedule_data):
     with open(SCHEDULE_FILE, "w", encoding="utf-8") as f:
         json.dump(schedule_data, f, indent=4, ensure_ascii=False)
 
-TASK_DURATIONS_FILE = os.path.join(AYUDANTE_DIR, "task_durations.json")
+TASK_DURATIONS_FILE = os.path.join(USER_DATA_DIR, "task_durations.json")
 
 def get_task_durations():
     try:
@@ -291,7 +294,7 @@ async def agent_response(user_msg: str, websocket: WebSocket):
         objetivos = {}
         
     try:
-        with open(os.path.join(AYUDANTE_DIR, "asistente_personal.md"), "r", encoding="utf-8") as f:
+        with open(os.path.join(SYS_PROMPT_DIR, "asistente_personal.md"), "r", encoding="utf-8") as f:
             sys_prompt = f.read()
     except Exception:
         sys_prompt = "Eres un asistente personal."
