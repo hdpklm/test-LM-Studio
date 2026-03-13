@@ -27,7 +27,7 @@ Eres un agente de desarrollo de software especializado. Tu comportamiento está 
 
 - **Regla de oro**: si una sub carpeta tiene su propio `project_status.md`, y `project_log.md`. añades y modificas solo los archivos que estan en la subcarpeta, no los de la carpeta raiz.
 - **Actualizar `project_status.md`**: modifica solo las entradas específicas que cambiaste. Antes de reescribir cualquier sección, lee su contenido actual completo y preserva todo lo que no tocaste. Nunca reescribas una sección entera solo porque modificaste una entrada dentro de ella.
-- **Añadir a `project_log.md`**: registra cada cambio realizado en esta sesión usando el formato definido más abajo. Nunca borres ni reescribas entradas anteriores.
+- **Append a `project_log.md`**: registra cada cambio realizado en esta sesión siguiendo las reglas de la sección "GESTIÓN DE LOGS".
 
 ---
 
@@ -122,8 +122,9 @@ Por cada endpoint:
 
 ---
 
-## 📝 FORMATO DEL HISTORIAL DE CAMBIOS (project_log.md)
+## 📝 GESTIÓN DE LOGS (project_log.md)
 
+### Formato de Registro
 Cada cambio, decisión o fallo se registra así:
 
 ```
@@ -133,14 +134,24 @@ Cada cambio, decisión o fallo se registra así:
 - **Solución**: qué se hizo exactamente y por qué
 ```
 
-Es **OBLIGATORIO** incluir el número de versión actualizado en el título del registro siempre que sea una mejora o característica nueva. Nunca asumas la versión anterior.
+### Reglas de Actualización
+- **Versión**: Es **OBLIGATORIO** incluir el número de versión actualizado en el título del registro siempre que sea una mejora o característica nueva. Nunca asumas la versión anterior.
+- **Inmutabilidad**: El historial nunca se borra. Solo se añade al final.
+- **Backup**: Las ideas descartadas van a la sección `# Backup` al principio de `project_log.md` con:
+  - Qué hacía la lógica anterior.
+  - Por qué fue reemplazada.
+  - Qué hace la versión nueva.
 
-El historial nunca se borra. Solo se añade al final.
+### Excepción de Modificación
+- **Regla de corrección**: Si estás arreglando un problema y sigues en el mismo chat, puedes modificar el **último** registro que escribiste en el log, pero solo si ese registro se creó en la sesión actual.
+- **Trazabilidad**: En este caso, debes mencionar también los intentos realizados que no funcionaron.
+- En cualquier otro escenario, los logs son estrictamente incrementales.
 
-Las ideas descartadas van a la sección `# Backup` al final de `project_log.md` con:
-- Qué hacía la lógica anterior.
-- Por qué fue reemplazada.
-- Qué hace la versión nueva.
+### Integridad y Método Append
+Para evitar errores de "target content not found" y asegurar la integridad:
+- **Prioridad Append**: Usa `cmd /c type temp_file.txt >> project_log.md` para añadir contenido de forma pura al final.
+- **Anclas**: Si usas herramientas de edición selectiva, usa bloques de texto grandes y únicos como anclas.
+- **Tabs**: Verifica siempre la presencia de **tabs** antes de intentar una sustitución.
 
 ---
 
