@@ -8,9 +8,18 @@ const AyudanteChat = () => {
 	const [schedule, setSchedule] = useState([]);
 	const [thinkingStatus, setThinkingStatus] = useState(null);
 	const [streamingMessage, setStreamingMessage] = useState('');
+	
+	// --- Estados para el Bloque de Pensamiento ---
+	const [thinkingContent, setThinkingContent] = useState('');
+	const [isThinkingMode, setIsThinkingMode] = useState(false);
+	const [isStreamingThinkingVisible, setIsStreamingThinkingVisible] = useState(false); // Colapsado por defecto
+	
 	const ws = useRef(null);
 	const messagesEndRef = useRef(null);
-	const streamingMessageRef = useRef(''); // Ref para evitar clausuras obsoletas en onmessage
+	const thinkingEndRef = useRef(null); // Ref para scroll en el div de pensamiento
+	const streamingMessageRef = useRef('');
+	const thinkingContentRef = useRef(''); // Ref para evitar clausuras
+	const isThinkingModeRef = useRef(false);
 
 	useEffect(() => {
 		if ("Notification" in window && Notification.permission === "default") {
@@ -24,14 +33,24 @@ const AyudanteChat = () => {
 		}
 	};
 
-
 	const scrollToBottom = () => {
 		messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
 	};
 
+	// Scroll automático para el pensamiento
+	const scrollThinkingToBottom = () => {
+		thinkingEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+	};
+
 	useEffect(() => {
 		scrollToBottom();
-	}, [messages]);
+	}, [messages, streamingMessage, thinkingContent, thinkingStatus]);
+
+	useEffect(() => {
+		if (isThinkingMode) {
+			scrollThinkingToBottom();
+		}
+	}, [thinkingContent]);
 
 	useEffect(() => {
 		ws.current = new WebSocket('ws://127.0.0.1:8001/ayudante');
@@ -48,24 +67,66 @@ const AyudanteChat = () => {
 					showNotification("🤖 Asistente", payload.data);
 				} else if (payload.type === 'chat_chunk') {
 					setThinkingStatus(null);
-					streamingMessageRef.current += payload.data;
-					setStreamingMessage(streamingMessageRef.current);
+					let chunk = payload.data;
+
+					// Detección de tags de pensamiento
+					if (chunk.includes('<think>')) {
+						isThinkingModeRef.current = true;
+						setIsThinkingMode(true);
+						setIsStreamingThinkingVisible(false); // El nuevo bloque empieza colapsado
+						chunk = chunk.replace('<think>', '');
+					}
+
+					if (isThinkingModeRef.current) {
+						if (chunk.includes('</think>')) {
+							const parts = chunk.split('</think>');
+							thinkingContentRef.current += parts[0];
+							setThinkingContent(thinkingContentRef.current);
+							
+							isThinkingModeRef.current = false;
+							setIsThinkingMode(false);
+							
+							if (parts[1]) {
+								streamingMessageRef.current += parts[1];
+								setStreamingMessage(streamingMessageRef.current);
+							}
+						} else {
+							thinkingContentRef.current += chunk;
+							setThinkingContent(thinkingContentRef.current);
+						}
+					} else {
+						streamingMessageRef.current += chunk;
+						setStreamingMessage(streamingMessageRef.current);
+					}
 				} else if (payload.type === 'chat_chunk_reset') {
 					streamingMessageRef.current = '';
 					setStreamingMessage('');
+					thinkingContentRef.current = '';
+					setThinkingContent('');
+					isThinkingModeRef.current = false;
+					setIsThinkingMode(false);
 				} else if (payload.type === 'chat_end') {
 					setThinkingStatus(null);
-					if (streamingMessageRef.current) {
+					if (streamingMessageRef.current || thinkingContentRef.current) {
 						const finalContent = streamingMessageRef.current;
+						const finalThinking = thinkingContentRef.current;
+						
 						setMessages(prev => [...prev, {
 							role: 'assistant',
 							content: finalContent,
+							thinking: finalThinking,
+							thinkingExpanded: false, // Empieza colapsado en el historial
 							time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 						}]);
-						showNotification("🤖 Asistente", finalContent);
+						
+						if (finalContent) showNotification("🤖 Asistente", finalContent);
 					}
 					streamingMessageRef.current = '';
 					setStreamingMessage('');
+					thinkingContentRef.current = '';
+					setThinkingContent('');
+					isThinkingModeRef.current = false;
+					setIsThinkingMode(false);
 				} else if (payload.type === 'thinking') {
 					setThinkingStatus(payload.status);
 				} else if (payload.type === 'schedule_update') {
@@ -75,17 +136,18 @@ const AyudanteChat = () => {
 					setSchedule([]);
 					streamingMessageRef.current = '';
 					setStreamingMessage('');
+					thinkingContentRef.current = '';
+					setThinkingContent('');
 					setThinkingStatus(null);
+					setIsThinkingMode(false);
 				}
 			} catch (err) {
-				// Fallback si el server manda texto plano
 				setMessages(prev => [...prev, { role: 'assistant', content: event.data }]);
 			}
 		};
 
 		ws.current.onclose = () => {
 			setStatus('Desconectado. Reconectando en 5s...');
-			setTimeout(() => { }, 5000);
 		};
 
 		ws.current.onerror = (error) => {
@@ -118,6 +180,12 @@ const AyudanteChat = () => {
 		}
 	};
 
+	const toggleThinkingHeader = (index) => {
+		setMessages(prev => prev.map((msg, idx) => 
+			idx === index ? { ...msg, thinkingExpanded: !msg.thinkingExpanded } : msg
+		));
+	};
+
 	return (
 		<div className="flex h-full relative overflow-hidden bg-zinc-900 font-sans">
 			{/* Panel Principal del Chat */}
@@ -126,7 +194,7 @@ const AyudanteChat = () => {
 					<h1 className="text-xl font-bold flex items-center gap-2 text-zinc-300">
 						🤖 Asistente Personal
 						<span className="text-xs font-normal px-2 py-1 rounded bg-zinc-800 text-zinc-400">
-							v1.69
+							v1.7.3
 						</span>
 					</h1>
 					<div className="flex items-center gap-3">
@@ -152,16 +220,37 @@ const AyudanteChat = () => {
 				</div>
 
 				<div className="flex-1 overflow-y-auto mb-4 space-y-4 pr-2 custom-scrollbar">
-					{messages.length === 0 && !streamingMessage && !thinkingStatus ? (
+					{messages.length === 0 && !streamingMessage && !thinkingContent && !thinkingStatus ? (
 						<div className="text-center text-zinc-500 italic mt-10">Esperando indicaciones del asistente o del schedule...</div>
 					) : (
 						<>
 							{messages.map((msg, idx) => (
 								<div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-1`}>
+									{msg.thinking && (
+										<div className="w-[80%] mb-2">
+											<button 
+												onClick={() => toggleThinkingHeader(idx)}
+												className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-400 mb-1 transition-colors"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${msg.thinkingExpanded ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+												Pensamiento interno
+											</button>
+											<div 
+												className={`bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3 text-xs text-zinc-400 italic font-mono custom-scrollbar text-left break-words transition-all duration-300 ${msg.thinkingExpanded ? 'max-h-60 overflow-y-auto' : 'max-h-[3em] overflow-hidden'}`}
+												style={!msg.thinkingExpanded ? {
+													display: '-webkit-box',
+													WebkitLineClamp: 1,
+													WebkitBoxOrient: 'vertical'
+												} : {}}
+											>
+												{msg.thinkingExpanded ? msg.thinking : 'Pensamiento'}
+											</div>
+										</div>
+									)}
 									<div className={`max-w-[80%] rounded-lg px-4 py-2 ${msg.role === 'user'
 										? 'bg-blue-600/50 text-blue-100 border border-blue-500/30'
 										: 'bg-zinc-800 text-zinc-300 border border-zinc-700'
-										}`}>
+										} text-left break-words`}>
 										{msg.content}
 									</div>
 									<span className="text-[10px] text-zinc-500 px-1 opacity-60">
@@ -170,9 +259,38 @@ const AyudanteChat = () => {
 								</div>
 							))}
 
+							{/* Bloque de Pensamiento en Streaming */}
+							{(thinkingContent || isThinkingMode) && (
+								<div className="flex flex-col items-start gap-1 w-[80%]">
+									<button 
+										onClick={() => setIsStreamingThinkingVisible(!isStreamingThinkingVisible)}
+										className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-400 mb-1 transition-colors"
+									>
+										<svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${isStreamingThinkingVisible ? 'rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+										Procesando pensamiento...
+									</button>
+									<div 
+										className={`w-full bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-3 text-xs text-zinc-400 italic font-mono custom-scrollbar text-left break-words transition-all duration-300 ${isStreamingThinkingVisible ? 'max-h-60 overflow-y-auto' : isThinkingMode ? 'max-h-[4.5em] overflow-hidden' : 'max-h-[3em] overflow-hidden'}`}
+										style={!isStreamingThinkingVisible ? {
+											display: '-webkit-box',
+											WebkitLineClamp: isThinkingMode ? 3 : 1,
+											WebkitBoxOrient: 'vertical'
+										} : {}}
+									>
+										{isStreamingThinkingVisible || isThinkingMode ? (
+											<>
+												{thinkingContent}
+												{isThinkingMode && <span className="inline-block w-1.5 h-3 ml-1 bg-zinc-600 animate-pulse align-middle"></span>}
+											</>
+										) : 'Pensamiento'}
+										<div ref={thinkingEndRef} />
+									</div>
+								</div>
+							)}
+
 							{streamingMessage && (
 								<div className="flex justify-start">
-									<div className="max-w-[80%] rounded-lg px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 animate-in fade-in duration-300">
+									<div className="max-w-[80%] rounded-lg px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 animate-in fade-in duration-300 text-left break-words">
 										{streamingMessage}
 										<span className="inline-block w-2 h-4 ml-1 bg-blue-500 animate-pulse align-middle"></span>
 									</div>
@@ -225,7 +343,7 @@ const AyudanteChat = () => {
 						<div className="text-zinc-500 text-sm italic py-4 text-center">No hay schedule programado para hoy.</div>
 					) : (
 						schedule.map((item, idx) => (
-							<div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3">
+							<div key={idx} className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-left">
 								<div className="flex justify-between items-start mb-2">
 									<span className="font-mono text-sm font-bold text-[#f4ba3e]">{item.time}</span>
 									<span className={`text-xs px-2 py-0.5 rounded-full ${item.status === 'pending' ? 'bg-amber-900/50 text-amber-300' : 'bg-emerald-900/50 text-emerald-300'}`}>

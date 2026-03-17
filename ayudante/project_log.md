@@ -52,3 +52,37 @@
     - Se añadió la herramienta `set_checkin_interval(minutes)` para que el asistente ajuste su propio tiempo de espera.
     - Se eliminaron las restricciones de herramientas en los prompts proactivos.
     - El monitor ahora es inteligente: si hay un aviso de schedule pendiente, el check-in proactivo se desactiva para no ser redundante.
+
+### 📝 Registro: [v1.7.0] - Implementación de Thinking UI y Reasoning Blocks
+- **Problema**: Los modelos de razonamiento (como DeepSeek R1) envían bloques `<think>` que ensuciaban el chat principal o se perdían si se filtraban, y el usuario no podía ver el proceso de pensamiento de forma organizada.
+- **Causa**: Falta de parsing específico para tags de pensamiento en el frontend.
+- **Solución**: 
+    - Se implementó detección de tags `<think>` y `</think>` en el stream del WebSocket.
+    - Se añadió un componente de UI colapsable con fondo oscuro y fuente mono para el razonamiento.
+    - Se implementó auto-scroll independiente para el bloque de pensamiento.
+    - Los pensamientos se guardan en el historial del mensaje para persistencia tras la recarga.
+
+### 📝 Registro: [v1.7.1] - Refinamiento de Bloques de Pensamiento
+- **Problema**: 
+    1. Al expandir un pensamiento se abrían todos los bloques del historial simultáneamente.
+    2. Los bloques de pensamiento ocupaban demasiado espacio inicial.
+- **Causa**: 
+    1. Uso de un estado global `isThinkingVisible` en lugar de estado por mensaje.
+    2. Falta de restricción de altura en estado colapsado.
+- **Solución**: 
+    - Se movió el estado de expansión al objeto del mensaje (`thinkingExpanded`).
+    - Se implementó un límite de 3 líneas (`line-clamp`) y una altura máxima reducida para bloques colapsados.
+    - Se estableció el estado inicial a 'colapsado' tanto para el streaming como para el historial.
+### 📝 Registro: [v1.7.2] - Compactación de Bloques de Pensamiento
+- **Problema**: Los bloques de pensamiento colapsados aún mostraban 3 líneas de contenido técnico, lo cual podía distraer o ensuciar el chat.
+- **Causa**: Configuración de `line-clamp: 3` que revelaba parte del proceso interno.
+- **Solución**: Se cambió la vista colapsada para mostrar únicamente el texto "Pensamiento" (o "Pensamiento..." durante streaming), ocultando todo el contenido técnico tras el label hasta que el usuario decida expandirlo.
+### 📝 Registro: [v1.7.3] - Refinamiento de Transiciones y Scroll
+- **Problema**: 
+    1. El bloque colapsado mostraba placeholder incluso mientras se generaba el pensamiento.
+    2. El bloque colapsado mantenía scrollbars innecesarios.
+- **Causa**: Lógica de renderizado unificada para streaming y persistencia.
+- **Solución**: 
+    - Se diferenció el estado `isThinkingMode`: mientras es `true`, el bloque colapsado muestra hasta 3 líneas del contenido real.
+    - Al recibir `</think>` (o en el historial), el bloque colapsado pasa a mostrar únicamente el label "Pensamiento" (1 línea).
+    - Se eliminó el scroll (`overflow-hidden`) en todos los estados colapsados.
