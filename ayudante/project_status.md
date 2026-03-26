@@ -1,4 +1,4 @@
-# Estado del Proyecto: Ayudante (v1.5.2)
+# Estado del Proyecto: Ayudante (v1.7.3)
 
 ## Modelos utilizados
 - **`google/gemma-3-1b`**
@@ -45,6 +45,7 @@ Para crear o modificar cualquier agente, el flujo de trabajo es el siguiente pas
 - **Intervalo Dinámico (Heartbeat)**: Nueva herramienta `set_checkin_interval` que permite al LLM ajustar cuánto tiempo esperar antes del siguiente check-in proactivo, permitiendo periodos de silencio más largos para tareas pesadas.
 - **Inteligencia de Schedule**: El monitor proactivo ahora se silencia si detecta que ya hay un aviso de schedule programado en el corto plazo, evitando saturar al usuario.
 - **Marcado de Tiempo (Timestamps)**: Todos los mensajes del chat incluyen ahora la hora exacta de envío.
+- **Thinking UI (v1.7.3)**: Soporte para modelos de razonamiento (como DeepSeek R1). El frontend detecta tags `<think>` e implementa un bloque colapsable con scroll interno y toggle individual. Durante el streaming muestra 3 líneas de contenido; al recibir `</think>`, colapsa a un label de 1 línea ("Pensamiento") sin scroll para optimizar el espacio.
 
 ### Archivos de código (Detalle)
 - **`api_websocket.py`**:
