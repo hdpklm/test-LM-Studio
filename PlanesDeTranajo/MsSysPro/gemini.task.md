@@ -1,0 +1,36 @@
+# Task: Implement UART Debug Protocol Changes
+
+- [x] Planning and Analysis [x]
+    - [x] Read [project_status.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_status.md) and [project_log.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_log.md)
+    - [x] Identify changes in [lut_protocol.h](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/unit-test/lut_protocol.h) and [lut_protocol_handler.cpp](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/unit-test/lut_protocol_handler.cpp)
+    - [x] Identify changes in Python tools
+- [x] Implementation [x]
+    - [x] Update [lut_protocol.h](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/unit-test/lut_protocol.h) with new format and IDs
+    - [x] Update [lut_protocol_handler.cpp](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/unit-test/lut_protocol_handler.cpp) with CRC-16 CCITT and index support
+    - [x] Update Python tools
+- [x] Verification [x]
+    - [x] Verify communication between MCU and Python
+- [x] Update Documentation [x]
+    - [x] Update [project_status.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_status.md) version and sections
+    - [x] Update [project_log.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_log.md)
+- [x] Advanced Validation & Error Tracking [x]
+    - [x] Expand global state in [main.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py) (sensors, flags, status)
+    - [x] Implement `errors` list and [log_error](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py#40-47) in [main.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py)
+    - [x] Add [wait_for_condition](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py#48-57) helper for callbacks
+    - [x] Pass bridge context to `TICKS` callbacks
+    - [x] Implement abort mechanism and final summary
+- [x] Timing & Unit Correction [x]
+    - [x] Update [project_status.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_status.md) to reflect `delta_ms` is in milliseconds
+    - [x] Verify [main.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py) handles `delta_ms` as milliseconds (already does, but double check)
+    - [x] Update [project_log.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_log.md) to v1.0.51
+- [x] Update Sensor Reader Format [x]
+    - [x] Modify [sensor_reader.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/sensor-reader/sensor_reader.py) to generate [.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/main.py) files instead of [.cpp](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/debug_task_entry.cpp)
+    - [x] Match [mock_1.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/mock_1.py) schema (`sens_id`, `delta_ms`, [data](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/sensor-reader/sensor_reader.py#143-178), `fn`, `msg`)
+    - [x] Map protocol types ('i', 'f', 'c') to integer keys (1, 4)
+- [x] Refine Sensor Reader & Docs [x]
+    - [x] Implement aggregation in [sensor_reader.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/sensor-reader/sensor_reader.py) for multiple key-value pairs per timestamp
+    - [x] Update [project_status.md](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/project_status.md) with complete bridge state and protocol details (v1.0.53)
+- [x] Finalize Output Naming [x]
+    - [x] Update [sensor_reader.py](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/tools/unit-test/sensor-reader/sensor_reader.py) to save as `mock_{timestamp}.py` directly in `reads/`
+    - [x] Consolidate all sensors into a single capture file (using 'All' data)
+    - [x] Sync [CapturedMockData](file:///c:/Users/Hassan/e2_studio/workspace.4.5/CEN01H_Beta_Modules/src/unit-test/lut_types.h#14-21) description if necessary
