@@ -1,5 +1,32 @@
 # Modelos para probar
 
+## Análisis de Modelos LLM para QA (v1.70)
+
+Este documento resume la investigación sobre los mejores modelos "Small Language Models" (SLM) enfocados en responder preguntas sobre textos cortos (QA) con alta velocidad.
+
+### Top 5 Modelos Recomendados
+
+| Puesto | Modelo | Parámetros | t/s (Est.) | Fortalezas |
+| :--- | :--- | :--- | :--- | :--- |
+| 1 | **Qwen 2.5 7B-Instruct** | 7.6B | ~100-140 | El más inteligente en su rango. Excelente en español. |
+| 2 | **Llama 3.2 3B-Instruct** | 3.2B | ~150-250 | Estándar de la industria, muy fiable y rápido. |
+| 3 | **Phi 3.5 mini-instruct** | 3.8B | ~120-180 | Lógica superior para textos complejos (Microsoft). |
+| 4 | **Gemma 3 4B-IT** | 4.0B | ~130-200 | Nueva arquitectura Google, precisión en extracción. |
+| 5 | **DeepSeek-R1-Distill-Qwen-7B** | 7.0B | ~80-120 | Razonamiento profundo (CoT) para evitar alucinaciones. |
+
+### Opiniones de la Comunidad e Insights
+
+- **Qwen 2.5** es actualmente el favorito de la comunidad para tareas locales debido a su gran rendimiento en idiomas distintos al inglés y su baja tasa de alucinaciones.
+- **Llama 3.2 3B** se destaca por su "seguimiento de instrucciones" (instruction following), siendo muy difícil que se salga del formato pedido.
+- **Phi 3.5** es el que mejor "entiende" conceptos difíciles en textos densos, a pesar de ser muy pequeño.
+
+### Resumen de Rendimiento
+Para textos de 10 líneas y 5 preguntas, todos estos modelos responden en menos de 1-2 segundos en una GPU moderna (RTX 3060+).
+
+---
+---
+---
+
 ## propmt:
 ```txt
 necesito que me busques y compares modelos LLM que sean pequeños, pero que funcionen bien.
